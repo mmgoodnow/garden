@@ -2,7 +2,11 @@
   "name": "garden",
   "module": "index.ts",
   "devDependencies": {
-    "@types/bun": "latest"
+    "@types/bun": "latest",
+    "playwright": "^1.58.1"
+  },
+  "scripts": {
+    "helper": "bun helper.ts"
   },
   "peerDependencies": {
     "typescript": "^5"
