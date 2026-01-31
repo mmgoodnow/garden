@@ -13,6 +13,7 @@ type RecordedScript = {
     recordedAt: string;
   };
   steps: RecordedStep[];
+  captchaSteps?: number[];
 };
 
 const USAGE = `garden helper
@@ -79,6 +80,10 @@ async function recordCodegen(url?: string) {
   }
 
   const recorded = parseCodegen(text);
+  const captchaSteps = await annotateCaptcha(recorded.steps);
+  if (captchaSteps && captchaSteps.length > 0) {
+    recorded.captchaSteps = captchaSteps;
+  }
   console.log(JSON.stringify(recorded, null, 2));
 }
 
@@ -160,4 +165,134 @@ function parseCodegen(text: string): RecordedScript {
 function extractFirstStringLiteral(input: string): string | null {
   const match = input.match(/(['"`])((?:\\.|(?!\1).)*)\1/);
   return match ? match[2] : null;
+}
+
+async function annotateCaptcha(
+  steps: RecordedStep[],
+): Promise<number[] | null> {
+  if (!process.stdin.isTTY) {
+    return null;
+  }
+
+  const answer = await promptLine("Annotate captcha steps? (y/N) ");
+  if (answer.toLowerCase() !== "y") {
+    return null;
+  }
+
+  if (steps.length === 0) {
+    console.log("No steps to annotate.");
+    return null;
+  }
+
+  console.log("\nCaptcha annotation mode");
+  console.log("j/k or n/p: move   c: mark start   C: mark end   Enter: finish\n");
+
+  let index = 0;
+  let start: number | null = null;
+  let end: number | null = null;
+
+  const stdin = process.stdin;
+  const wasRaw = stdin.isRaw;
+  stdin.setRawMode(true);
+  stdin.resume();
+  stdin.setEncoding("utf8");
+
+  const render = () => {
+    const step = steps[index];
+    const summary = summarizeStep(step);
+    const startTag = start === index ? " [start]" : "";
+    const endTag = end === index ? " [end]" : "";
+    process.stdout.write(
+      `\r[${index + 1}/${steps.length}] ${summary}${startTag}${endTag}   `,
+    );
+  };
+
+  render();
+
+  return await new Promise((resolve) => {
+    const finish = () => {
+      stdin.off("data", onData);
+      stdin.setRawMode(wasRaw ?? false);
+      stdin.pause();
+      process.stdout.write("\n");
+
+      if (start === null || end === null) {
+        resolve(null);
+        return;
+      }
+
+      const from = Math.min(start, end);
+      const to = Math.max(start, end);
+      const range = [];
+      for (let i = from; i <= to; i += 1) range.push(i);
+      resolve(range);
+    };
+
+    const onData = (chunk: string) => {
+      if (chunk === "\u0003") {
+        finish();
+        return;
+      }
+
+      if (chunk === "\r" || chunk === "\n") {
+        finish();
+        return;
+      }
+
+      if (chunk === "j" || chunk === "n" || chunk === "\u001b[C") {
+        if (index < steps.length - 1) index += 1;
+        render();
+        return;
+      }
+
+      if (chunk === "k" || chunk === "p" || chunk === "\u001b[D") {
+        if (index > 0) index -= 1;
+        render();
+        return;
+      }
+
+      if (chunk === "c") {
+        start = index;
+        render();
+        return;
+      }
+
+      if (chunk === "C") {
+        end = index;
+        render();
+        return;
+      }
+    };
+
+    stdin.on("data", onData);
+  });
+}
+
+function summarizeStep(step: RecordedStep): string {
+  if (step.type === "goto" && step.url) {
+    return `goto ${truncate(step.url, 80)}`;
+  }
+
+  if (step.type === "fill" || step.type === "type" || step.type === "press") {
+    const value = step.value ? ` "${truncate(step.value, 30)}"` : "";
+    return `${step.type} ${truncate(step.locator ?? "", 60)}${value}`;
+  }
+
+  return `${step.type} ${truncate(step.locator ?? "", 80)}`;
+}
+
+function truncate(value: string, max: number): string {
+  if (value.length <= max) return value;
+  return `${value.slice(0, max - 1)}…`;
+}
+
+function promptLine(question: string): Promise<string> {
+  return new Promise((resolve) => {
+    process.stdout.write(question);
+    const onData = (data: Buffer) => {
+      process.stdin.off("data", onData);
+      resolve(data.toString().trim());
+    };
+    process.stdin.on("data", onData);
+  });
 }
