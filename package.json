@@ -2,15 +2,21 @@
   "name": "garden",
   "module": "index.ts",
   "devDependencies": {
-    "@types/bun": "latest",
-    "playwright": "^1.58.1"
+    "@types/bun": "latest"
   },
   "scripts": {
-    "helper": "bun helper.ts"
+    "helper": "bun helper.ts",
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@meck93/kysely-bun-sqlite": "^0.2.0",
+    "kysely": "^0.28.11",
+    "playwright": "^1.58.1"
+  }
 }
