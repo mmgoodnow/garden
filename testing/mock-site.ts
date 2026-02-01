@@ -4,7 +4,7 @@ const VALID_PASSWORD = process.env.MOCK_PASSWORD ?? "password123";
 const COOKIE_NAME = "mock_session";
 const COOKIE_VALUE = "ok";
 const CAPTCHA_IMAGE_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
+  "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAO0lEQVR42u3OMREAIBAEsReBEkQgAjnIwSQMKo4ixW6danOcZPXW94oEAAAAAAAAAAAAAAAAAPAPINkFIk0iMOID+AgAAAAASUVORK5CYII=";
 
 function html(body: string, status = 200, headers: HeadersInit = {}) {
   return new Response(`<!doctype html>${body}`, {

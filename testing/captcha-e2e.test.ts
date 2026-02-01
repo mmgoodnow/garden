@@ -32,7 +32,9 @@ runTest(
       expect(runRes.status).toBe(303);
 
       const run = await waitForRun(env.dbPath, siteId, 60000);
-      expect(run.status).toBe("success");
+      if (run.status !== "success") {
+        throw new Error(run.error ?? "Captcha run failed without error");
+      }
       expect(run.error).toBeNull();
 
       const shotSize = await waitForScreenshotSize(env.dbPath, run.id, 10000);
