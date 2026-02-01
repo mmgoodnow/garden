@@ -357,7 +357,7 @@ async function solveCaptcha(
     return { html: container.outerHTML, imageSrcs: images };
   });
 
-  const sanitizedHtml = sanitizeCaptchaHtml(html);
+  const sanitizedHtml = sanitizeCaptchaHtml(html, secrets);
   const resolvedImages = await resolveImageAssets(page, imageSrcs);
   const { htmlWithMarkers, imageInputs, imageMap } = buildCaptchaPayload(
     sanitizedHtml,
@@ -457,7 +457,7 @@ function buildCaptchaPayload(html: string, images: ResolvedImage[]) {
   return { htmlWithMarkers, imageInputs, imageMap };
 }
 
-function sanitizeCaptchaHtml(html: string): string {
+function sanitizeCaptchaHtml(html: string, secrets: SecretValues): string {
   let sanitized = html;
   sanitized = sanitized.replace(
     /<input\b[^>]*type=(['"])password\1[^>]*>/gi,
@@ -465,6 +465,16 @@ function sanitizeCaptchaHtml(html: string): string {
   );
   sanitized = sanitized.replace(/\svalue=(['"]).*?\1/gi, "");
   sanitized = sanitized.replace(/\sdata-value=(['"]).*?\1/gi, "");
+  const secretValues = Array.from(
+    new Set(
+      Object.values(secrets).filter(
+        (value): value is string => typeof value === "string" && value.length > 0,
+      ),
+    ),
+  );
+  for (const value of secretValues) {
+    sanitized = sanitized.split(value).join("[REDACTED]");
+  }
   return sanitized;
 }
 
