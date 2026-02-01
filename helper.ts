@@ -96,9 +96,9 @@ async function recordCodegen(url?: string) {
   }
 
   const recorded = parseCodegen(text);
-  const redacted = redactSecrets(recorded.steps);
-  const annotated = await annotateCaptcha(redacted.steps);
-  recorded.steps = annotated;
+  const annotated = await annotateCaptcha(recorded.steps);
+  const redacted = redactSecrets(annotated);
+  recorded.steps = redacted.steps;
   recorded.secrets = await mapSecretKinds(redacted.secrets);
   console.log(JSON.stringify(recorded, null, 2));
 }
@@ -227,14 +227,18 @@ async function annotateCaptcha(steps: ActionStep[]): Promise<Step[]> {
   return updated;
 }
 
-function redactSecrets(steps: ActionStep[]): {
-  steps: ActionStep[];
+function redactSecrets(steps: Step[]): {
+  steps: Step[];
   secrets: SecretSpec[];
 } {
   let counter = 0;
   const secrets: SecretSpec[] = [];
 
   const redactedSteps = steps.map((step) => {
+    if (step.type === "captcha") {
+      return step;
+    }
+
     if ((step.type === "fill" || step.type === "type") && step.value) {
       counter += 1;
       const placeholder = `{{secret_${counter}}}`;
