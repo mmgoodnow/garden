@@ -116,6 +116,12 @@ export function layout(title: string, body: string) {
       th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
       tr:last-child td { border-bottom: none; }
       .muted { color: var(--muted); }
+      .error-cell {
+        max-width: 260px;
+        white-space: normal;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+      }
       .row {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -272,7 +278,7 @@ export function renderSiteDetail(
         <td>${escapeHtml(run.status)}</td>
         <td>${escapeHtml(run.started_at)}</td>
         <td>${escapeHtml(run.finished_at ?? "-")}</td>
-        <td>${escapeHtml(run.error ?? "-")}</td>
+        <td class="error-cell">${escapeHtml(run.error ?? "-")}</td>
       </tr>`,
     )
     .join("");
