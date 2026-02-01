@@ -7,6 +7,7 @@
   "scripts": {
     "helper": "bun helper.ts",
     "dev": "bun --hot index.ts",
+    "mock:site": "bun testing/mock-site.ts",
     "start": "bun index.ts"
   },
   "peerDependencies": {

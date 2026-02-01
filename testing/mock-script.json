@@ -1,0 +1,41 @@
+{
+  "meta": {
+    "source": "mock-site",
+    "version": 1,
+    "recordedAt": "2026-02-01T00:00:00.000Z"
+  },
+  "steps": [
+    {
+      "type": "goto",
+      "url": "http://localhost:4001/login"
+    },
+    {
+      "type": "fill",
+      "locator": "page.getByLabel('Username')",
+      "value": "{{username}}"
+    },
+    {
+      "type": "fill",
+      "locator": "page.getByLabel('Password')",
+      "value": "{{password}}"
+    },
+    {
+      "type": "click",
+      "locator": "page.getByRole('button', { name: 'Sign in' })"
+    },
+    {
+      "type": "goto",
+      "url": "http://localhost:4001/dashboard"
+    }
+  ],
+  "secrets": [
+    {
+      "placeholder": "{{username}}",
+      "kind": "username"
+    },
+    {
+      "placeholder": "{{password}}",
+      "kind": "password"
+    }
+  ]
+}
