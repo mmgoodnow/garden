@@ -228,6 +228,47 @@ Bun.serve({
         return new Response(JSON.stringify({ ok: true }), { status: 200 });
       },
     },
+    "/api/scripts/wait": {
+      GET: async (req) => {
+        const url = new URL(req.url);
+        const siteId = Number(url.searchParams.get("siteId") ?? 0);
+        const afterId = Number(url.searchParams.get("afterId") ?? 0);
+        if (!siteId) {
+          return new Response(JSON.stringify({ error: "siteId required" }), {
+            status: 400,
+          });
+        }
+
+        const timeoutMs = 25000;
+        const intervalMs = 1000;
+        const start = Date.now();
+
+        while (Date.now() - start < timeoutMs) {
+          const latest = await db
+            .selectFrom("scripts")
+            .selectAll()
+            .where("site_id", "=", siteId)
+            .orderBy("created_at", "desc")
+            .limit(1)
+            .executeTakeFirst();
+
+          if (latest && latest.id > afterId) {
+            return new Response(
+              JSON.stringify({
+                id: latest.id,
+                content: latest.content,
+                created_at: latest.created_at,
+              }),
+              { status: 200 },
+            );
+          }
+
+          await new Promise((resolve) => setTimeout(resolve, intervalMs));
+        }
+
+        return new Response(JSON.stringify({ ok: false }), { status: 200 });
+      },
+    },
   },
 });
 

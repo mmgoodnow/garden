@@ -255,6 +255,8 @@ export function renderSiteDetail(
   runs: RunRow[],
   screenshots: ScreenshotRow[],
 ) {
+  const scriptId = script?.id ?? 0;
+  const scriptContent = script ? escapeHtml(script.content) : "";
   const runRows = runs
     .map(
       (run) => `<tr>
@@ -304,11 +306,15 @@ export function renderSiteDetail(
       </section>
       <section>
         <h3>Script</h3>
+        <div class="muted" style="margin-bottom: 8px;">
+          <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">
+            Copy CLI command
+          </button>
+          <span id="cli-status" class="muted" style="margin-left: 8px;"></span>
+        </div>
         <form method="post" action="/sites/${site.id}/script">
           <label>Recorded JSON</label>
-          <textarea name="script" rows="12">${
-            script ? escapeHtml(script.content) : ""
-          }</textarea>
+          <textarea name="script" rows="12" data-script-id="${scriptId}">${scriptContent}</textarea>
           <button type="submit">Save Script</button>
         </form>
       </section>
@@ -349,7 +355,59 @@ export function renderSiteDetail(
           </tbody>
         </table>
       </section>
-    </div>`,
+    </div>
+
+    <script>
+      (() => {
+        const copyBtn = document.getElementById("copy-cli");
+        const statusEl = document.getElementById("cli-status");
+        const textarea = document.querySelector("textarea[name='script']");
+        if (!copyBtn || !statusEl || !textarea) return;
+
+        const siteId = copyBtn.getAttribute("data-site-id");
+        const origin = window.location.origin;
+        const cmd =
+          "bun run /Users/mmgoodnow/src/garden/helper.ts record --upload-to " +
+          origin +
+          " --site-id " +
+          siteId;
+
+        async function waitForScript() {
+          const afterId = Number(textarea.dataset.scriptId || "0");
+          statusEl.textContent = "Waiting for upload...";
+          try {
+            const res = await fetch(
+              "/api/scripts/wait?siteId=" + siteId + "&afterId=" + afterId,
+            );
+            if (!res.ok) {
+              statusEl.textContent = "Upload wait failed.";
+              return;
+            }
+            const payload = await res.json();
+            if (payload && payload.content) {
+              textarea.value = payload.content;
+              textarea.dataset.scriptId = String(payload.id || afterId);
+              statusEl.textContent = "Script received.";
+              return;
+            }
+            statusEl.textContent = "No script uploaded yet.";
+          } catch (err) {
+            statusEl.textContent = "Upload wait failed.";
+          }
+        }
+
+        copyBtn.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(cmd);
+            statusEl.textContent = "Copied. Run it locally.";
+          } catch (err) {
+            window.prompt("Copy CLI command:", cmd);
+            statusEl.textContent = "Copy command to run locally.";
+          }
+          void waitForScript();
+        });
+      })();
+    </script>`,
   );
 }
 
