@@ -185,7 +185,7 @@ async function annotateCaptcha(
   }
 
   const start = await pickStepIndex(
-    "Where does the captcha start?",
+    "What's the first action of the captcha solution?",
     steps,
     0,
   );
@@ -194,7 +194,7 @@ async function annotateCaptcha(
   }
 
   const end = await pickStepIndex(
-    "Where does the captcha end?",
+    "What's the last action of the captcha solution?",
     steps,
     start,
     start,
@@ -255,6 +255,10 @@ async function pickStepIndex(
   stdin.setEncoding("utf8");
 
   const windowSize = 12;
+  const reset = "\x1b[0m";
+  const highlight = "\x1b[36m";
+  const startMark = "\x1b[33m";
+  const dim = "\x1b[2m";
 
   const render = () => {
     process.stdout.write("\x1b[2J\x1b[H");
@@ -270,19 +274,20 @@ async function pickStepIndex(
     }
 
     if (start > 0) {
-      console.log("  ...");
+      console.log(`  ${dim}...${reset}`);
     }
 
     for (let i = start; i < end; i += 1) {
       const summary = summarizeStep(steps[i]);
       if (i === index) {
-        console.log("  ------------------------------------------------------------");
-        console.log(`  >> ${i + 1}. ${summary}`);
+        console.log(`  ${highlight}>> ${i + 1}. ${summary}${reset}`);
         continue;
       }
 
       if (highlightIndex === i) {
-        console.log(`  -- ${i + 1}. ${summary} [captcha start]`);
+        console.log(
+          `  ${startMark}*  ${i + 1}. ${summary} [captcha start]${reset}`,
+        );
         continue;
       }
 
@@ -290,7 +295,7 @@ async function pickStepIndex(
     }
 
     if (end < steps.length) {
-      console.log("  ...");
+      console.log(`  ${dim}...${reset}`);
     }
   };
 
