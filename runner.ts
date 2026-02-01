@@ -681,7 +681,7 @@ function normalizeRunError(message: string) {
     message.includes("playwright install") ||
     message.includes("chromium_headless_shell")
   ) {
-    return "Playwright browsers missing. Run `bunx playwright install chromium`.";
+    return "Playwright browsers missing in image. Rebuild the container to install browsers.";
   }
   return message;
 }

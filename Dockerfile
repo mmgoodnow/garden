@@ -5,7 +5,9 @@ WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --production
 
-RUN bunx playwright install --with-deps chromium
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN mkdir -p /ms-playwright
+RUN bunx playwright install --with-deps chromium chromium-headless-shell
 
 COPY . .
 
