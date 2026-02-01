@@ -232,7 +232,8 @@ Bun.serve({
 });
 
 console.log(`Garden server running on http://localhost:${PORT}`);
-if (process.env.SCHEDULER_ENABLED === "1") {
+const schedulerFlag = process.env.SCHEDULER_ENABLED?.toLowerCase();
+if (schedulerFlag !== "0" && schedulerFlag !== "false") {
   startScheduler();
 }
 
