@@ -184,12 +184,21 @@ async function annotateCaptcha(
     return null;
   }
 
-  const start = await pickStepIndex("Where does the captcha start?", steps, 0);
+  const start = await pickStepIndex(
+    "Where does the captcha start?",
+    steps,
+    0,
+  );
   if (start === null) {
     return null;
   }
 
-  const end = await pickStepIndex("Where does the captcha end?", steps, start);
+  const end = await pickStepIndex(
+    "Where does the captcha end?",
+    steps,
+    start,
+    start,
+  );
   if (end === null) {
     return null;
   }
@@ -234,6 +243,7 @@ async function pickStepIndex(
   title: string,
   steps: RecordedStep[],
   initialIndex: number,
+  highlightIndex?: number,
 ): Promise<number | null> {
   const stdin = process.stdin;
   if (!stdin.isTTY) return null;
@@ -268,9 +278,15 @@ async function pickStepIndex(
       if (i === index) {
         console.log("  ------------------------------------------------------------");
         console.log(`  >> ${i + 1}. ${summary}`);
-      } else {
-        console.log(`     ${i + 1}. ${summary}`);
+        continue;
       }
+
+      if (highlightIndex === i) {
+        console.log(`  -- ${i + 1}. ${summary} [captcha start]`);
+        continue;
+      }
+
+      console.log(`     ${i + 1}. ${summary}`);
     }
 
     if (end < steps.length) {
