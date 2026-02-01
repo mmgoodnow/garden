@@ -14,7 +14,7 @@
 - [x] Add API routes to create/update sites and upload scripts
 - [x] Encrypt secrets at rest with env key
 - [ ] Add migrations strategy (versioned schema)
-- [ ] Validate API routes with curl
+- [x] Validate API routes with curl
 
 ## Runner (Playwright)
 - [x] Build step runner (click/fill/goto/etc.)
@@ -22,12 +22,12 @@
 - [ ] Handle captcha step placeholder (manual or stub solver)
 - [x] Capture screenshot after login and store metadata
 - [x] Track runs + last success/failure
-- [ ] Validate runner against mock site
+- [x] Validate runner against mock site
 
 ## Validation & Local Test Harness
-- [ ] Add a mock login site (simple form + session cookie) for repeatable tests
-- [ ] Document curl flow to create a site, upload script JSON, set credentials, run job
-- [ ] Verify runner works end-to-end with the mock site
+- [x] Add a mock login site (simple form + session cookie) for repeatable tests
+- [x] Document curl flow to create a site, upload script JSON, set credentials, run job
+- [x] Verify runner works end-to-end with the mock site
 - [ ] Note elevated permissions may be required to bind to ports in sandboxed environments
 
 ## UI (SSR)
