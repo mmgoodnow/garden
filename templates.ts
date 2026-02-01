@@ -171,6 +171,11 @@ export function layout(title: string, body: string) {
         max-height: 320px;
         overflow: auto;
       }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
       @media (max-width: 720px) {
         header { padding: 16px 18px; }
         main { padding: 20px 18px 44px; }
@@ -286,12 +291,14 @@ export function renderSiteDetail(
     `<section>
       <h2>${escapeHtml(site.name)}</h2>
       <p class="muted">${escapeHtml(site.domain)}</p>
-      <form method="post" action="/sites/${site.id}/run">
-        <button type="submit">Run Now</button>
-      </form>
-      <form method="post" action="/sites/${site.id}/delete" onsubmit="return confirm('Delete this site and all related data?');">
-        <button type="submit" class="secondary">Delete Site</button>
-      </form>
+      <div class="actions">
+        <form method="post" action="/sites/${site.id}/run">
+          <button type="submit">Run Now</button>
+        </form>
+        <form method="post" action="/sites/${site.id}/delete" onsubmit="return confirm('Delete this site and all related data?');">
+          <button type="submit" class="secondary">Delete Site</button>
+        </form>
+      </div>
     </section>
 
     <div class="row">
