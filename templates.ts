@@ -381,7 +381,7 @@ export function renderSiteDetail(
         const origin = window.location.origin;
         const siteUrl = ${JSON.stringify(siteUrl)};
         const cmd =
-          "bun run /Users/mmgoodnow/src/garden/helper.ts record " +
+          "bun --use-system-ca run /Users/mmgoodnow/src/garden/helper.ts record " +
           siteUrl +
           " --upload-to " +
           origin +
