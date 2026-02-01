@@ -152,6 +152,17 @@ export function layout(title: string, body: string) {
         color: var(--accent);
         border: 1px solid var(--accent);
       }
+      form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      form > label {
+        margin-top: 6px;
+      }
+      form > label:first-child {
+        margin-top: 0;
+      }
       pre {
         white-space: pre-wrap;
         background: var(--panel-2);
