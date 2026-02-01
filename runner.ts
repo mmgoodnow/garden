@@ -325,12 +325,34 @@ async function solveCaptcha(
   const locator = resolveLocator(page, target.locator);
   await locator.scrollIntoViewIfNeeded();
 
-  const html = await locator.evaluate((el) => el.outerHTML);
-  const imageSrcs = await locator.evaluate((el) =>
-    Array.from(el.querySelectorAll("img"))
+  const { html, imageSrcs } = await locator.evaluate((el) => {
+    const pickContainer = (node: Element) => {
+      let current: Element | null = node;
+      let chosen: Element = node;
+
+      for (let i = 0; i < 3; i += 1) {
+        if (!current?.parentElement) break;
+        const parent = current.parentElement;
+        const parentHtml = parent.outerHTML ?? "";
+        const chosenHtml = chosen.outerHTML ?? "";
+        const hasImage = Boolean(parent.querySelector("img"));
+        if (hasImage || parentHtml.length > chosenHtml.length + 200) {
+          chosen = parent;
+        }
+        current = parent;
+      }
+
+      return chosen;
+    };
+
+    const container = pickContainer(el);
+    const images = Array.from(container.querySelectorAll("img"))
       .map((img) => img.getAttribute("src"))
-      .filter((src): src is string => Boolean(src)),
-  );
+      .filter((src): src is string => Boolean(src));
+
+    return { html: container.outerHTML, imageSrcs: images };
+  });
+
   const resolvedImages = await resolveImageAssets(page, imageSrcs);
   const { htmlWithMarkers, imageInputs, imageMap } = buildCaptchaPayload(
     html,
@@ -425,7 +447,7 @@ async function requestCaptchaSteps(
     throw new Error("OPENAI_API_KEY is required to solve captcha steps.");
   }
 
-  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const model = process.env.OPENAI_MODEL ?? "gpt-5-mini";
   const instructions = [
     "You are helping automate captcha completion inside a web page.",
     "Return ONLY JSON matching the provided schema.",

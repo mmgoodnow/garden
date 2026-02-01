@@ -6,7 +6,7 @@ services:
     environment:
       APP_ENC_KEY_BASE64: ${APP_ENC_KEY_BASE64}
       OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5-mini}
       SCHEDULER_ENABLED: "1"
       SCHEDULER_INTERVAL_MINUTES: "360"
       SCHEDULE_EVERY_DAYS: "30"
