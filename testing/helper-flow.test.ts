@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
+import { processCodegen } from "../helper-lib";
 import {
-  buildMockScript,
   createSite,
   setCredentials,
   startTestEnv,
@@ -11,16 +11,27 @@ import {
   waitForScreenshotSize,
 } from "./test-helpers";
 
+const TIMEOUT_MS = 60000;
+
 test(
-  "runner end-to-end flow (mock site + curl-style API calls)",
+  "helper output runs against mock login flow",
   async () => {
     const env = await startTestEnv();
+
     try {
+      const codegen = `
+await page.goto('http://localhost:${env.mockPort}/login');
+await page.getByLabel('Username').fill('test@example.com');
+await page.getByLabel('Password').fill('password123');
+await page.getByRole('button', { name: 'Sign in' }).click();
+await page.goto('http://localhost:${env.mockPort}/dashboard');
+`;
+
+      const script = await processCodegen(codegen);
       const { res, siteId } = await createSite(env.serverPort);
       expect(res.status).toBe(303);
       expect(Number.isFinite(siteId)).toBe(true);
 
-      const script = buildMockScript(env.mockPort);
       const scriptRes = await uploadScript(env.serverPort, siteId, script);
       expect(scriptRes.status).toBe(200);
       const scriptBody = await scriptRes.json();
@@ -42,5 +53,5 @@ test(
       stopTestEnv(env);
     }
   },
-  60000,
+  TIMEOUT_MS,
 );
