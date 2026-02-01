@@ -117,10 +117,11 @@ export function layout(title: string, body: string) {
       tr:last-child td { border-bottom: none; }
       .muted { color: var(--muted); }
       .error-cell {
-        max-width: 260px;
-        white-space: normal;
-        overflow-wrap: anywhere;
-        word-break: break-word;
+        width: 100%;
+        max-width: none;
+        display: block;
+        white-space: nowrap;
+        overflow-x: auto;
       }
       .row {
         display: grid;
