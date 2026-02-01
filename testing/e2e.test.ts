@@ -5,11 +5,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createServer } from "node:net";
+import { fileURLToPath } from "node:url";
 import { Database } from "bun:sqlite";
 
 type Proc = ReturnType<typeof Bun.spawn>;
 
-const ROOT = "/Users/mmgoodnow/src/garden";
+const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const MOCK_USERNAME = "test@example.com";
 const MOCK_PASSWORD = "password123";
 
