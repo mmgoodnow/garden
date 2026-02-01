@@ -452,7 +452,9 @@ async function requestCaptchaSteps(
     "You are helping automate captcha completion inside a web page.",
     "Return ONLY JSON matching the provided schema.",
     "Use CSS selectors for locator fields (e.g. '#submit', '.tile:nth-child(2)').",
-    "Pick the option that best matches the poster/image, then click verify/submit if needed.",
+    "All selectors MUST target elements inside the #captcha container.",
+    "Do NOT click any submit/sign-in/continue buttons; the caller will submit the form.",
+    "Pick the option that best matches the poster/image.",
     "Only include the actions required to solve the captcha and proceed.",
   ].join(" ");
 
@@ -563,7 +565,7 @@ function normalizeCaptchaStep(step: CaptchaModelStep): Step {
   }
 
   if (step.type === "goto") {
-    return { type: "goto", url: step.url ?? "" };
+    throw new Error("Captcha solver returned disallowed goto step.");
   }
 
   const locator = step.locator ?? step.selector;
@@ -571,12 +573,37 @@ function normalizeCaptchaStep(step: CaptchaModelStep): Step {
     throw new Error(`Captcha step missing locator for ${step.type}.`);
   }
 
+  const scopedLocator = scopeCaptchaSelector(locator);
+
   return {
     type: step.type,
-    locator,
+    locator: scopedLocator,
     value: step.value,
     args: step.args,
   };
+}
+
+function scopeCaptchaSelector(locator: string): string {
+  const trimmed = locator.trim();
+  if (!trimmed) {
+    throw new Error("Captcha selector is empty.");
+  }
+  if (trimmed.startsWith("page.")) {
+    throw new Error("Captcha selector must be CSS, not Playwright locator syntax.");
+  }
+  const lower = trimmed.toLowerCase();
+  if (
+    lower.startsWith("text=") ||
+    lower.startsWith("xpath=") ||
+    lower.startsWith("id=") ||
+    lower.startsWith("css=")
+  ) {
+    throw new Error("Captcha selector must be plain CSS.");
+  }
+  if (trimmed.startsWith("#captcha")) {
+    return trimmed;
+  }
+  return `#captcha ${trimmed}`;
 }
 
 async function captureScreenshot(runId: number, page: Page) {

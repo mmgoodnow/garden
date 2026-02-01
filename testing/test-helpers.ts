@@ -121,6 +121,10 @@ export function buildMockScript(mockPort: number) {
           },
         ],
       },
+      {
+        type: "click",
+        locator: "page.getByRole('button', { name: 'Sign in' })",
+      },
       { type: "goto", url: `http://localhost:${mockPort}/dashboard` },
     ],
     secrets: [
