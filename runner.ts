@@ -314,6 +314,10 @@ async function solveCaptcha(
   step: Step & { type: "captcha" },
   secrets: SecretValues,
 ) {
+  const maxAttempts = Number.parseInt(
+    process.env.CAPTCHA_MAX_ATTEMPTS ?? "2",
+    10,
+  );
   const target =
     step.steps.find((child) => child.type === "click" && child.locator) ??
     step.steps.find((child) => child.locator);
@@ -359,20 +363,36 @@ async function solveCaptcha(
     resolvedImages,
   );
 
-  const modelSteps = await requestCaptchaSteps(
-    page.url(),
-    htmlWithMarkers,
-    imageInputs,
-    imageMap,
-  );
+  let lastError: unknown = null;
+  const attempts = Number.isFinite(maxAttempts) && maxAttempts > 0 ? maxAttempts : 1;
 
-  if (!modelSteps.length) {
-    throw new Error("Captcha solver returned no steps.");
-  }
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const modelSteps = await requestCaptchaSteps(
+      page.url(),
+      htmlWithMarkers,
+      imageInputs,
+      imageMap,
+      lastError,
+    );
 
-  for (const modelStep of modelSteps) {
-    const normalized = normalizeCaptchaStep(modelStep);
-    await runStep(page, normalized, secrets);
+    if (!modelSteps.length) {
+      throw new Error("Captcha solver returned no steps.");
+    }
+
+    try {
+      for (const modelStep of modelSteps) {
+        const normalized = normalizeCaptchaStep(modelStep);
+        await runStep(page, normalized, secrets);
+      }
+      return;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[runner] captcha attempt ${attempt} failed: ${message}`);
+      if (attempt === attempts) {
+        throw error;
+      }
+    }
   }
 }
 
@@ -441,6 +461,7 @@ async function requestCaptchaSteps(
   html: string,
   imageInputs: Array<{ type: "input_image"; image_url: string }>,
   imageMap: string,
+  previousError?: unknown,
 ): Promise<CaptchaModelStep[]> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -458,6 +479,13 @@ async function requestCaptchaSteps(
     "Only include the actions required to solve the captcha and proceed.",
   ].join(" ");
 
+  const errorText =
+    previousError instanceof Error
+      ? previousError.message
+      : previousError
+        ? String(previousError)
+        : "";
+
   const userText = [
     `Page URL: ${pageUrl}`,
     "",
@@ -466,6 +494,7 @@ async function requestCaptchaSteps(
     "",
     imageMap ? "Image map:" : "No images found in fragment.",
     imageMap || "",
+    errorText ? `Previous attempt error: ${errorText}` : "",
   ]
     .filter(Boolean)
     .join("\n");
