@@ -113,10 +113,6 @@ export function buildMockScript(mockPort: number) {
         value: "{{password}}",
       },
       {
-        type: "click",
-        locator: "page.getByRole('button', { name: 'Sign in' })",
-      },
-      {
         type: "captcha",
         steps: [
           {

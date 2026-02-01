@@ -3,7 +3,6 @@ const VALID_USERNAME = process.env.MOCK_USERNAME ?? "test@example.com";
 const VALID_PASSWORD = process.env.MOCK_PASSWORD ?? "password123";
 const COOKIE_NAME = "mock_session";
 const COOKIE_VALUE = "ok";
-const PENDING_COOKIE = "mock_pending";
 const CAPTCHA_POSTER_PATH = new URL("./captcha-poster.png", import.meta.url);
 
 function html(body: string, status = 200, headers: HeadersInit = {}) {
@@ -38,14 +37,9 @@ function isAuthenticated(req: Request) {
   return cookies[COOKIE_NAME] === COOKIE_VALUE;
 }
 
-function isPending(req: Request) {
-  const cookies = parseCookies(req.headers.get("cookie"));
-  return cookies[PENDING_COOKIE] === "1";
-}
-
 function loginPage(message = "") {
   const banner = message
-    ? `<p data-testid="error" style="color:#b00020">${message}</p>`
+    ? `<div data-testid="error" style="color:#b00020">${message}</div>`
     : "";
   return html(`
   <html lang="en">
@@ -58,11 +52,27 @@ function loginPage(message = "") {
       <main>
         <h1>Mock Login</h1>
         ${banner}
-        <form method="post" action="/login">
+        <form method="post" action="/login" id="login-form">
           <label for="username">Username</label>
           <input id="username" name="username" autocomplete="username" />
           <label for="password">Password</label>
           <input id="password" name="password" type="password" autocomplete="current-password" />
+          <fieldset id="captcha">
+            <legend>Captcha: Which movie does this poster belong to?</legend>
+            <img src="/captcha-image" alt="Movie poster" />
+            <label>
+              <input id="movie-nosferatu" type="radio" name="movie" value="nosferatu" />
+              Nosferatu
+            </label>
+            <label>
+              <input id="movie-metropolis" type="radio" name="movie" value="metropolis" />
+              Metropolis
+            </label>
+            <label>
+              <input id="movie-general" type="radio" name="movie" value="the-general" />
+              The General
+            </label>
+          </fieldset>
           <button type="submit">Sign in</button>
         </form>
       </main>
@@ -90,47 +100,9 @@ function dashboardPage(username: string) {
   `);
 }
 
-function captchaPage(message = "") {
-  const banner = message
-    ? `<p data-testid="captcha-note" style="color:#1f7a5c">${message}</p>`
-    : "";
-  return html(`
-  <html lang="en">
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Mock Captcha</title>
-    </head>
-    <body>
-      <main>
-        <h1>Captcha Check</h1>
-        <section id="captcha" data-testid="captcha">
-          <p>Which movie does this poster belong to?</p>
-          <img src="/captcha-image" alt="Movie poster" />
-          ${banner}
-          <form method="post" action="/captcha">
-            <fieldset>
-              <legend>Pick one</legend>
-              <label>
-                <input id="movie-nosferatu" type="radio" name="movie" value="nosferatu" />
-                Nosferatu
-              </label>
-              <label>
-                <input id="movie-metropolis" type="radio" name="movie" value="metropolis" />
-                Metropolis
-              </label>
-              <label>
-                <input id="movie-general" type="radio" name="movie" value="the-general" />
-                The General
-              </label>
-            </fieldset>
-            <button id="verify" type="submit">Verify</button>
-          </form>
-        </section>
-      </main>
-    </body>
-  </html>
-  `);
+function captchaError(message = "") {
+  if (!message) return "";
+  return `<p data-testid="captcha-note" style="color:#1f7a5c">${message}</p>`;
 }
 
 Bun.serve({
@@ -141,9 +113,6 @@ Bun.serve({
         if (isAuthenticated(req)) {
           return redirect("/dashboard");
         }
-        if (isPending(req)) {
-          return redirect("/captcha");
-        }
         return redirect("/login");
       },
     },
@@ -152,21 +121,27 @@ Bun.serve({
         if (isAuthenticated(req)) {
           return redirect("/dashboard");
         }
-        if (isPending(req)) {
-          return redirect("/captcha");
-        }
         return loginPage();
       },
       POST: async (req) => {
         const form = await req.formData();
         const username = String(form.get("username") ?? "").trim();
         const password = String(form.get("password") ?? "").trim();
-        if (username === VALID_USERNAME && password === VALID_PASSWORD) {
-          return redirect("/captcha", {
-            "Set-Cookie": `${PENDING_COOKIE}=1; Path=/; HttpOnly; SameSite=Lax`,
+        const movie = String(form.get("movie") ?? "");
+        if (
+          username === VALID_USERNAME &&
+          password === VALID_PASSWORD &&
+          movie === "nosferatu"
+        ) {
+          return redirect("/dashboard", {
+            "Set-Cookie": `${COOKIE_NAME}=${COOKIE_VALUE}; Path=/; HttpOnly; SameSite=Lax`,
           });
         }
-        return loginPage("Invalid credentials");
+        return loginPage(
+          `Invalid credentials or captcha.${captchaError(
+            "Select the correct movie poster.",
+          )}`,
+        );
       },
     },
     "/dashboard": {
@@ -182,7 +157,6 @@ Bun.serve({
         return redirect("/login", {
           "Set-Cookie": [
             `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`,
-            `${PENDING_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`,
           ].join(", "),
         });
       },
@@ -192,33 +166,6 @@ Bun.serve({
         return new Response(Bun.file(CAPTCHA_POSTER_PATH), {
           headers: { "Content-Type": "image/png" },
         });
-      },
-    },
-    "/captcha": {
-      GET: async (req) => {
-        if (isAuthenticated(req)) {
-          return redirect("/dashboard");
-        }
-        if (!isPending(req)) {
-          return redirect("/login");
-        }
-        return captchaPage();
-      },
-      POST: async (req) => {
-        if (!isPending(req)) {
-          return redirect("/login");
-        }
-        const form = await req.formData();
-        const movie = String(form.get("movie") ?? "");
-        if (movie === "nosferatu") {
-          return redirect("/dashboard", {
-            "Set-Cookie": [
-              `${COOKIE_NAME}=${COOKIE_VALUE}; Path=/; HttpOnly; SameSite=Lax`,
-              `${PENDING_COOKIE}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`,
-            ].join(", "),
-          });
-        }
-        return captchaPage("That answer is incorrect. Try again.");
       },
     },
   },
