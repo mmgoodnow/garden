@@ -3,7 +3,7 @@ import { processCodegen } from "./helper-lib";
 const USAGE = `garden helper
 
 Usage:
-  bun helper.ts record [url] [--upload-to <baseUrl>] [--site-id <id>] [--insecure]
+  bun helper.ts record [url] [--upload-to <baseUrl>] [--site-id <id>] [--insecure] [--use-curl]
 
 Commands:
   record    Launch Playwright codegen, then print recorded script JSON.
@@ -24,6 +24,7 @@ if (command === "record") {
     recordArgs.uploadTo,
     recordArgs.siteId,
     recordArgs.insecure,
+    recordArgs.useCurl,
   );
   process.exit(0);
 }
@@ -36,6 +37,7 @@ async function recordCodegen(
   uploadTo?: string,
   siteId?: number,
   insecure?: boolean,
+  useCurl?: boolean,
 ) {
   const tmpDir = process.env.TMPDIR ?? "/tmp";
   const outputPath = `${tmpDir}/garden-codegen-${Date.now()}.js`;
@@ -75,7 +77,7 @@ async function recordCodegen(
 
   const recorded = await processCodegen(text);
   if (uploadTo && siteId) {
-    await uploadScript(uploadTo, siteId, recorded, insecure);
+    await uploadScript(uploadTo, siteId, recorded, insecure, useCurl);
     console.log(`Uploaded script for site ${siteId} to ${uploadTo}.`);
   } else {
     console.log(JSON.stringify(recorded, null, 2));
@@ -87,6 +89,7 @@ function parseRecordArgs(rawArgs: string[]) {
   let uploadTo: string | undefined;
   let siteId: number | undefined;
   let insecure = false;
+  let useCurl = false;
 
   for (let i = 0; i < rawArgs.length; i += 1) {
     const arg = rawArgs[i];
@@ -112,12 +115,17 @@ function parseRecordArgs(rawArgs: string[]) {
       continue;
     }
 
+    if (arg === "--use-curl") {
+      useCurl = true;
+      continue;
+    }
+
     if (!arg.startsWith("--") && !url) {
       url = arg;
     }
   }
 
-  return { url, uploadTo, siteId, insecure };
+  return { url, uploadTo, siteId, insecure, useCurl };
 }
 
 async function uploadScript(
@@ -125,16 +133,71 @@ async function uploadScript(
   siteId: number,
   script: object,
   insecure?: boolean,
+  useCurl?: boolean,
 ) {
   const base = uploadTo.replace(/\/$/, "");
-  const res = await fetch(`${base}/api/scripts`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ siteId, script }),
-    ...(insecure ? { tls: { rejectUnauthorized: false } } : {}),
+  const payload = JSON.stringify({ siteId, script });
+
+  if (useCurl) {
+    await uploadWithCurl(`${base}/api/scripts`, payload, insecure);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${base}/api/scripts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: payload,
+      ...(insecure ? { tls: { rejectUnauthorized: false } } : {}),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Upload failed (${res.status}): ${body}`);
+    }
+  } catch (error) {
+    if (isCertError(error)) {
+      await uploadWithCurl(`${base}/api/scripts`, payload, insecure);
+      return;
+    }
+    throw error;
+  }
+}
+
+function isCertError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return /issuer certificate|certificate|verify|self signed/i.test(message);
+}
+
+async function uploadWithCurl(url: string, payload: string, insecure?: boolean) {
+  const cmd = [
+    "curl",
+    "--fail",
+    "--silent",
+    "--show-error",
+    "-X",
+    "POST",
+    "-H",
+    "Content-Type: application/json",
+    ...(insecure ? ["--insecure"] : []),
+    "--data-binary",
+    "@-",
+    url,
+  ];
+
+  const proc = Bun.spawn({
+    cmd,
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
   });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Upload failed (${res.status}): ${body}`);
+
+  const writer = proc.stdin.getWriter();
+  await writer.write(payload);
+  await writer.close();
+
+  const exitCode = await proc.exited;
+  if (exitCode !== 0) {
+    const stderr = await new Response(proc.stderr).text();
+    throw new Error(`Upload failed (curl exit ${exitCode}): ${stderr}`);
   }
 }
