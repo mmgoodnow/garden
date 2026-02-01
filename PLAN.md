@@ -6,7 +6,7 @@
 - [x] Annotate captcha block with a step range
 - [x] Redact typed values into placeholders
 - [x] Auto-map secrets with fallback prompt
-- [ ] Validate helper output against real login flow
+- [x] Validate helper output against real login flow
 
 ## Backend (Bun + SQLite)
 - [x] Define SQLite schema (sites, runs, scripts, screenshots)
@@ -19,7 +19,7 @@
 ## Runner (Playwright)
 - [x] Build step runner (click/fill/goto/etc.)
 - [x] Inject decrypted secrets at runtime
-- [ ] Handle captcha step placeholder (manual or stub solver)
+- [x] Handle captcha step placeholder (manual or stub solver)
 - [x] Capture screenshot after login and store metadata
 - [x] Track runs + last success/failure
 - [x] Validate runner against mock site
@@ -35,10 +35,10 @@
 - [x] Site detail: script summary, run history, screenshots
 - [x] Create/edit site form
 - [x] “Run now” button + status feedback
-- [ ] Manual UI smoke test (create site, upload script, run)
+- [x] Manual UI smoke test (create site, upload script, run)
 
 ## Ops
-- [ ] Dockerfile + compose for NAS
-- [ ] Volumes for SQLite + screenshots
-- [ ] Cron or scheduler for monthly runs
-- [ ] Logging + basic retry policy
+- [x] Dockerfile + compose for NAS
+- [x] Volumes for SQLite + screenshots (DB stores screenshots; /config volume)
+- [x] Cron or scheduler for monthly runs
+- [x] Logging + basic retry policy
