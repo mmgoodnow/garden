@@ -6,19 +6,23 @@
 - [x] Annotate captcha block with a step range
 - [x] Redact typed values into placeholders
 - [x] Auto-map secrets with fallback prompt
+- [ ] Validate helper output against real login flow
 
 ## Backend (Bun + SQLite)
-- [ ] Define SQLite schema (sites, runs, scripts, screenshots, secrets)
-- [ ] Implement Kysely setup + migrations
-- [ ] Add API routes to create/update sites and upload scripts
-- [ ] Encrypt secrets at rest with env key
+- [x] Define SQLite schema (sites, runs, scripts, screenshots)
+- [x] Implement Kysely setup (init on startup)
+- [x] Add API routes to create/update sites and upload scripts
+- [x] Encrypt secrets at rest with env key
+- [ ] Add migrations strategy (versioned schema)
+- [ ] Validate API routes with curl
 
 ## Runner (Playwright)
-- [ ] Build step runner (click/fill/goto/etc.)
-- [ ] Inject decrypted secrets at runtime
+- [x] Build step runner (click/fill/goto/etc.)
+- [x] Inject decrypted secrets at runtime
 - [ ] Handle captcha step placeholder (manual or stub solver)
-- [ ] Capture screenshot after login and store metadata
-- [ ] Track runs + last success/failure
+- [x] Capture screenshot after login and store metadata
+- [x] Track runs + last success/failure
+- [ ] Validate runner against mock site
 
 ## Validation & Local Test Harness
 - [ ] Add a mock login site (simple form + session cookie) for repeatable tests
@@ -27,10 +31,11 @@
 - [ ] Note elevated permissions may be required to bind to ports in sandboxed environments
 
 ## UI (SSR)
-- [ ] Dashboard: sites list with last run status
-- [ ] Site detail: script summary, run history, screenshots
-- [ ] Create/edit site form
-- [ ] “Run now” button + status feedback
+- [x] Dashboard: sites list with last run status
+- [x] Site detail: script summary, run history, screenshots
+- [x] Create/edit site form
+- [x] “Run now” button + status feedback
+- [ ] Manual UI smoke test (create site, upload script, run)
 
 ## Ops
 - [ ] Dockerfile + compose for NAS
