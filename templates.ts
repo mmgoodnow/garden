@@ -288,20 +288,19 @@ export function renderSiteDetail(
 
   return layout(
     site.name,
-    `<section>
-      <h2>${escapeHtml(site.name)}</h2>
-      <p class="muted">${escapeHtml(site.domain)}</p>
-      <div class="actions">
-        <form method="post" action="/sites/${site.id}/run">
-          <button type="submit">Run Now</button>
-        </form>
-        <form method="post" action="/sites/${site.id}/delete" onsubmit="return confirm('Delete this site and all related data?');">
-          <button type="submit" class="secondary">Delete Site</button>
-        </form>
-      </div>
-    </section>
-
-    <div class="row">
+    `<div class="row">
+      <section>
+        <h2>${escapeHtml(site.name)}</h2>
+        <p class="muted">${escapeHtml(site.domain)}</p>
+        <div class="actions">
+          <form method="post" action="/sites/${site.id}/run">
+            <button type="submit">Run Now</button>
+          </form>
+          <form method="post" action="/sites/${site.id}/delete" onsubmit="return confirm('Delete this site and all related data?');">
+            <button type="submit" class="secondary">Delete Site</button>
+          </form>
+        </div>
+      </section>
       <section>
         <h3>Credentials</h3>
         <form method="post" action="/sites/${site.id}/credentials">
@@ -317,21 +316,22 @@ export function renderSiteDetail(
           }
         </p>
       </section>
-      <section>
-        <h3>Script</h3>
-        <div class="muted" style="margin-bottom: 8px;">
-          <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">
-            Copy CLI command
-          </button>
-          <span id="cli-status" class="muted" style="margin-left: 8px;"></span>
-        </div>
-        <form method="post" action="/sites/${site.id}/script">
-          <label>Recorded JSON</label>
-          <textarea name="script" rows="12" data-script-id="${scriptId}">${scriptContent}</textarea>
-          <button type="submit">Save Script</button>
-        </form>
-      </section>
     </div>
+
+    <section>
+      <h3>Script</h3>
+      <div class="muted" style="margin-bottom: 8px;">
+        <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">
+          Copy CLI command
+        </button>
+        <span id="cli-status" class="muted" style="margin-left: 8px;"></span>
+      </div>
+      <form method="post" action="/sites/${site.id}/script">
+        <label>Recorded JSON</label>
+        <textarea name="script" rows="12" data-script-id="${scriptId}">${scriptContent}</textarea>
+        <button type="submit">Save Script</button>
+      </form>
+    </section>
 
     <div class="row">
       <section>
