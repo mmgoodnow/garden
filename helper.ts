@@ -174,11 +174,6 @@ async function annotateCaptcha(
     return null;
   }
 
-  const answer = await promptLine("Annotate captcha steps? (y/N) ");
-  if (answer.toLowerCase() !== "y") {
-    return null;
-  }
-
   if (steps.length === 0) {
     console.log("No steps to annotate.");
     return null;
