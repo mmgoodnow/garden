@@ -452,6 +452,7 @@ async function requestCaptchaSteps(
     "You are helping automate captcha completion inside a web page.",
     "Return ONLY JSON matching the provided schema.",
     "Use CSS selectors for locator fields (e.g. '#submit', '.tile:nth-child(2)').",
+    "Pick the option that best matches the poster/image, then click verify/submit if needed.",
     "Only include the actions required to solve the captcha and proceed.",
   ].join(" ");
 

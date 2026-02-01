@@ -3,8 +3,7 @@ const VALID_USERNAME = process.env.MOCK_USERNAME ?? "test@example.com";
 const VALID_PASSWORD = process.env.MOCK_PASSWORD ?? "password123";
 const COOKIE_NAME = "mock_session";
 const COOKIE_VALUE = "ok";
-const CAPTCHA_IMAGE_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAO0lEQVR42u3OMREAIBAEsReBEkQgAjnIwSQMKo4ixW6danOcZPXW94oEAAAAAAAAAAAAAAAAAPAPINkFIk0iMOID+AgAAAAASUVORK5CYII=";
+const CAPTCHA_POSTER_PATH = new URL("./captcha-poster.png", import.meta.url);
 
 function html(body: string, status = 200, headers: HeadersInit = {}) {
   return new Response(`<!doctype html>${body}`, {
@@ -107,16 +106,16 @@ function captchaPage(message = "") {
             <fieldset>
               <legend>Pick one</legend>
               <label>
-                <input type="radio" name="movie" value="moonlight" checked />
-                Moonlight Bay
+                <input id="movie-nosferatu" type="radio" name="movie" value="nosferatu" />
+                Nosferatu
               </label>
               <label>
-                <input type="radio" name="movie" value="sunset" />
-                Sunset Drive
+                <input id="movie-metropolis" type="radio" name="movie" value="metropolis" />
+                Metropolis
               </label>
               <label>
-                <input type="radio" name="movie" value="evergreen" />
-                Evergreen Lane
+                <input id="movie-general" type="radio" name="movie" value="the-general" />
+                The General
               </label>
             </fieldset>
             <button id="verify" type="submit">Verify</button>
@@ -175,8 +174,7 @@ Bun.serve({
     },
     "/captcha-image": {
       GET: async () => {
-        const bytes = Buffer.from(CAPTCHA_IMAGE_BASE64, "base64");
-        return new Response(bytes, {
+        return new Response(Bun.file(CAPTCHA_POSTER_PATH), {
           headers: { "Content-Type": "image/png" },
         });
       },
@@ -188,10 +186,15 @@ Bun.serve({
         }
         return captchaPage();
       },
-      POST: async () => {
-        return redirect("/dashboard", {
-          "Set-Cookie": `${COOKIE_NAME}=${COOKIE_VALUE}; Path=/; HttpOnly; SameSite=Lax`,
-        });
+      POST: async (req) => {
+        const form = await req.formData();
+        const movie = String(form.get("movie") ?? "");
+        if (movie === "nosferatu") {
+          return redirect("/dashboard", {
+            "Set-Cookie": `${COOKIE_NAME}=${COOKIE_VALUE}; Path=/; HttpOnly; SameSite=Lax`,
+          });
+        }
+        return captchaPage("That answer is incorrect. Try again.");
       },
     },
   },
