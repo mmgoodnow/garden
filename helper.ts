@@ -11,8 +11,6 @@ type SecretKind = "username" | "password" | "secret";
 type SecretSpec = {
   placeholder: string;
   kind: SecretKind;
-  action?: string;
-  locator?: string;
 };
 
 type CaptchaStep = {
@@ -99,7 +97,7 @@ async function recordCodegen(url?: string) {
   const annotated = await annotateCaptcha(recorded.steps);
   const redacted = redactSecrets(annotated);
   recorded.steps = redacted.steps;
-  recorded.secrets = await mapSecretKinds(redacted.secrets);
+  recorded.secrets = await mapSecretKinds(redacted.secrets, redacted.steps);
   console.log(JSON.stringify(recorded, null, 2));
 }
 
@@ -245,8 +243,6 @@ function redactSecrets(steps: Step[]): {
       secrets.push({
         placeholder,
         kind: "secret",
-        action: step.type,
-        locator: step.locator,
       });
       return {
         ...step,
@@ -260,12 +256,13 @@ function redactSecrets(steps: Step[]): {
   return { steps: redactedSteps, secrets };
 }
 
-async function mapSecretKinds(secrets: SecretSpec[]): Promise<SecretSpec[]> {
+async function mapSecretKinds(
+  secrets: SecretSpec[],
+  steps: Step[],
+): Promise<SecretSpec[]> {
   let prompted = false;
   for (const secret of secrets) {
-    const locator = (secret.locator ?? "").toLowerCase();
-    const action = (secret.action ?? "").toLowerCase();
-    const hint = `${locator} ${action}`;
+    const hint = findSecretHint(secret.placeholder, steps);
 
     if (
       hint.includes("pass") ||
@@ -296,7 +293,7 @@ async function mapSecretKinds(secrets: SecretSpec[]): Promise<SecretSpec[]> {
       prompted = true;
     }
 
-    const source = formatSecretSource(secret);
+    const source = hint ? truncate(hint, 50) : "unknown";
     const answer = await promptLine(
       `  ${secret.placeholder} from ${source} [u=username, p=password, s=secret]: `,
     );
@@ -309,10 +306,17 @@ async function mapSecretKinds(secrets: SecretSpec[]): Promise<SecretSpec[]> {
   return secrets;
 }
 
-function formatSecretSource(secret: SecretSpec): string {
-  const action = secret.action ?? "action";
-  const locator = secret.locator ? truncate(secret.locator, 50) : "unknown";
-  return `${action} ${locator}`;
+function findSecretHint(placeholder: string, steps: Step[]): string | null {
+  for (const step of steps) {
+    if (step.type === "captcha") continue;
+    if (
+      (step.type === "fill" || step.type === "type") &&
+      step.value === placeholder
+    ) {
+      return `${step.type} ${step.locator ?? ""}`.trim();
+    }
+  }
+  return null;
 }
 
 function promptLine(question: string): Promise<string> {
