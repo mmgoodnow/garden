@@ -3,6 +3,7 @@ import { PORT } from "./config";
 import { encryptSecret } from "./crypto";
 import { parseScript } from "./script";
 import { runSite } from "./runner";
+import { startScheduler } from "./scheduler";
 import {
   layout,
   renderNewSite,
@@ -231,6 +232,9 @@ Bun.serve({
 });
 
 console.log(`Garden server running on http://localhost:${PORT}`);
+if (process.env.SCHEDULER_ENABLED === "1") {
+  startScheduler();
+}
 
 function htmlResponse(body: string, status = 200) {
   return new Response(body, {
