@@ -99,7 +99,7 @@ async function recordCodegen(url?: string) {
   const annotated = await annotateCaptcha(recorded.steps);
   const redacted = redactSecrets(annotated);
   recorded.steps = redacted.steps;
-  recorded.secrets = mapSecretKinds(redacted.secrets);
+  recorded.secrets = await mapSecretKinds(redacted.secrets);
   console.log(JSON.stringify(recorded, null, 2));
 }
 
@@ -260,7 +260,8 @@ function redactSecrets(steps: Step[]): {
   return { steps: redactedSteps, secrets };
 }
 
-function mapSecretKinds(secrets: SecretSpec[]): SecretSpec[] {
+async function mapSecretKinds(secrets: SecretSpec[]): Promise<SecretSpec[]> {
+  let prompted = false;
   for (const secret of secrets) {
     const locator = (secret.locator ?? "").toLowerCase();
     const action = (secret.action ?? "").toLowerCase();
@@ -285,10 +286,50 @@ function mapSecretKinds(secrets: SecretSpec[]): SecretSpec[] {
       continue;
     }
 
-    secret.kind = "secret";
+    if (!process.stdin.isTTY) {
+      secret.kind = "secret";
+      continue;
+    }
+
+    if (!prompted) {
+      console.log("\nMap secret placeholders:");
+      prompted = true;
+    }
+
+    const source = formatSecretSource(secret);
+    const answer = await promptLine(
+      `  ${secret.placeholder} from ${source} [u=username, p=password, s=secret]: `,
+    );
+    const normalized = answer.trim().toLowerCase();
+    if (normalized === "u") secret.kind = "username";
+    else if (normalized === "p") secret.kind = "password";
+    else secret.kind = "secret";
   }
 
   return secrets;
+}
+
+function formatSecretSource(secret: SecretSpec): string {
+  const action = secret.action ?? "action";
+  const locator = secret.locator ? truncate(secret.locator, 50) : "unknown";
+  return `${action} ${locator}`;
+}
+
+function promptLine(question: string): Promise<string> {
+  const stdin = process.stdin;
+  const wasRaw = stdin.isRaw;
+  if (stdin.isTTY) stdin.setRawMode(false);
+  stdin.resume();
+
+  return new Promise((resolve) => {
+    process.stdout.write(question);
+    const onData = (data: Buffer) => {
+      stdin.off("data", onData);
+      if (stdin.isTTY) stdin.setRawMode(wasRaw ?? false);
+      resolve(data.toString().trim());
+    };
+    stdin.on("data", onData);
+  });
 }
 
 function summarizeStep(step: ActionStep | CaptchaStep): string {
