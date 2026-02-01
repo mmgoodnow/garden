@@ -191,9 +191,8 @@ async function uploadWithCurl(url: string, payload: string, insecure?: boolean) 
     stderr: "pipe",
   });
 
-  const writer = proc.stdin.getWriter();
-  await writer.write(payload);
-  await writer.close();
+  proc.stdin.write(payload);
+  proc.stdin.end();
 
   const exitCode = await proc.exited;
   if (exitCode !== 0) {
