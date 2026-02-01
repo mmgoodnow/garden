@@ -41,6 +41,7 @@ export async function startTestEnv(): Promise<TestEnv> {
       PORT: String(serverPort),
       DATA_DIR: dataDir,
       DB_PATH: dbPath,
+      SCHEDULER_ENABLED: "0",
     },
     stdout: "pipe",
     stderr: "pipe",
@@ -121,6 +122,30 @@ export function buildMockScript(mockPort: number) {
       { placeholder: "{{username}}", kind: "username" },
       { placeholder: "{{password}}", kind: "password" },
     ],
+  };
+}
+
+export function buildCaptchaScript(mockPort: number) {
+  return {
+    meta: {
+      source: "mock-captcha-test",
+      version: 1,
+      recordedAt: new Date().toISOString(),
+    },
+    steps: [
+      { type: "goto", url: `http://localhost:${mockPort}/captcha` },
+      {
+        type: "captcha",
+        steps: [
+          {
+            type: "click",
+            locator: "page.getByRole('button', { name: 'Verify' })",
+          },
+        ],
+      },
+      { type: "goto", url: `http://localhost:${mockPort}/dashboard` },
+    ],
+    secrets: [],
   };
 }
 

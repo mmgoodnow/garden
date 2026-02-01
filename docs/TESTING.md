@@ -72,3 +72,4 @@ curl -i -s -X POST http://localhost:3000/sites/${SITE_ID}/run
 
 - If you change the mock site port or credentials, update `testing/mock-script.json` or the values you POST.
 - The mock site is intentionally minimal; add fields or flows there as runner capabilities grow.
+- The captcha solver test runs only when `OPENAI_API_KEY` is set (Bun loads `.env` automatically).

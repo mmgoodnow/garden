@@ -3,6 +3,8 @@ const VALID_USERNAME = process.env.MOCK_USERNAME ?? "test@example.com";
 const VALID_PASSWORD = process.env.MOCK_PASSWORD ?? "password123";
 const COOKIE_NAME = "mock_session";
 const COOKIE_VALUE = "ok";
+const CAPTCHA_IMAGE_BASE64 =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
 
 function html(body: string, status = 200, headers: HeadersInit = {}) {
   return new Response(`<!doctype html>${body}`, {
@@ -83,6 +85,34 @@ function dashboardPage(username: string) {
   `);
 }
 
+function captchaPage(message = "") {
+  const banner = message
+    ? `<p data-testid="captcha-note" style="color:#1f7a5c">${message}</p>`
+    : "";
+  return html(`
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <title>Mock Captcha</title>
+    </head>
+    <body>
+      <main>
+        <h1>Captcha Check</h1>
+        <section id="captcha" data-testid="captcha">
+          <p>Please click Verify to continue.</p>
+          <img src="/captcha-image" alt="captcha grid" />
+          ${banner}
+          <form method="post" action="/captcha">
+            <button id="verify" type="submit">Verify</button>
+          </form>
+        </section>
+      </main>
+    </body>
+  </html>
+  `);
+}
+
 Bun.serve({
   port: PORT,
   routes: {
@@ -125,6 +155,27 @@ Bun.serve({
       GET: async () => {
         return redirect("/login", {
           "Set-Cookie": `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`,
+        });
+      },
+    },
+    "/captcha-image": {
+      GET: async () => {
+        const bytes = Buffer.from(CAPTCHA_IMAGE_BASE64, "base64");
+        return new Response(bytes, {
+          headers: { "Content-Type": "image/png" },
+        });
+      },
+    },
+    "/captcha": {
+      GET: async (req) => {
+        if (isAuthenticated(req)) {
+          return redirect("/dashboard");
+        }
+        return captchaPage();
+      },
+      POST: async () => {
+        return redirect("/dashboard", {
+          "Set-Cookie": `${COOKIE_NAME}=${COOKIE_VALUE}; Path=/; HttpOnly; SameSite=Lax`,
         });
       },
     },
