@@ -166,6 +166,31 @@ Bun.serve({
         return redirect(`/sites/${siteId}`);
       },
     },
+    "/sites/:id/delete": {
+      POST: async (req) => {
+        const siteId = Number(req.params.id);
+        if (!Number.isFinite(siteId)) {
+          return htmlResponse(layout("Not Found", `<section>Site not found.</section>`), 404);
+        }
+
+        const runIds = await db
+          .selectFrom("runs")
+          .select("id")
+          .where("site_id", "=", siteId)
+          .execute();
+        const ids = runIds.map((row) => row.id);
+
+        if (ids.length) {
+          await db.deleteFrom("screenshots").where("run_id", "in", ids).execute();
+        }
+
+        await db.deleteFrom("runs").where("site_id", "=", siteId).execute();
+        await db.deleteFrom("scripts").where("site_id", "=", siteId).execute();
+        await db.deleteFrom("sites").where("id", "=", siteId).execute();
+
+        return redirect("/");
+      },
+    },
     "/runs/:id": {
       GET: async (req) => {
         const runId = Number(req.params.id);

@@ -257,6 +257,13 @@ export function renderSiteDetail(
 ) {
   const scriptId = script?.id ?? 0;
   const scriptContent = script ? escapeHtml(script.content) : "";
+  const domain = site.domain.trim();
+  const hasScheme = /^https?:\/\//i.test(domain);
+  const isLocal =
+    domain.includes("localhost") ||
+    domain.startsWith("127.") ||
+    domain.startsWith("0.0.0.0");
+  const siteUrl = hasScheme ? domain : `${isLocal ? "http" : "https"}://${domain}`;
   const runRows = runs
     .map(
       (run) => `<tr>
@@ -285,6 +292,9 @@ export function renderSiteDetail(
       <p class="muted">${escapeHtml(site.domain)}</p>
       <form method="post" action="/sites/${site.id}/run">
         <button type="submit">Run Now</button>
+      </form>
+      <form method="post" action="/sites/${site.id}/delete" onsubmit="return confirm('Delete this site and all related data?');">
+        <button type="submit" class="secondary">Delete Site</button>
       </form>
     </section>
 
@@ -366,8 +376,11 @@ export function renderSiteDetail(
 
         const siteId = copyBtn.getAttribute("data-site-id");
         const origin = window.location.origin;
+        const siteUrl = ${JSON.stringify(siteUrl)};
         const cmd =
-          "bun run /Users/mmgoodnow/src/garden/helper.ts record --upload-to " +
+          "bun run /Users/mmgoodnow/src/garden/helper.ts record " +
+          siteUrl +
+          " --upload-to " +
           origin +
           " --site-id " +
           siteId;
