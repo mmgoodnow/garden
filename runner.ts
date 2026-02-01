@@ -330,26 +330,7 @@ async function solveCaptcha(
   await locator.scrollIntoViewIfNeeded();
 
   const { html, imageSrcs } = await locator.evaluate((el) => {
-    const pickContainer = (node: Element) => {
-      let current: Element | null = node;
-      let chosen: Element = node;
-
-      for (let i = 0; i < 3; i += 1) {
-        if (!current?.parentElement) break;
-        const parent = current.parentElement;
-        const parentHtml = parent.outerHTML ?? "";
-        const chosenHtml = chosen.outerHTML ?? "";
-        const hasImage = Boolean(parent.querySelector("img"));
-        if (hasImage || parentHtml.length > chosenHtml.length + 200) {
-          chosen = parent;
-        }
-        current = parent;
-      }
-
-      return chosen;
-    };
-
-    const container = pickContainer(el);
+    const container = el.closest?.("#captcha") ?? el;
     const images = Array.from(container.querySelectorAll("img"))
       .map((img) => img.getAttribute("src"))
       .filter((src): src is string => Boolean(src));
@@ -357,9 +338,10 @@ async function solveCaptcha(
     return { html: container.outerHTML, imageSrcs: images };
   });
 
+  const sanitizedHtml = sanitizeCaptchaHtml(html);
   const resolvedImages = await resolveImageAssets(page, imageSrcs);
   const { htmlWithMarkers, imageInputs, imageMap } = buildCaptchaPayload(
-    html,
+    sanitizedHtml,
     resolvedImages,
   );
 
@@ -454,6 +436,17 @@ function buildCaptchaPayload(html: string, images: ResolvedImage[]) {
     .join("\n");
 
   return { htmlWithMarkers, imageInputs, imageMap };
+}
+
+function sanitizeCaptchaHtml(html: string): string {
+  let sanitized = html;
+  sanitized = sanitized.replace(
+    /<input\b[^>]*type=(['"])password\1[^>]*>/gi,
+    "",
+  );
+  sanitized = sanitized.replace(/\svalue=(['"]).*?\1/gi, "");
+  sanitized = sanitized.replace(/\sdata-value=(['"]).*?\1/gi, "");
+  return sanitized;
 }
 
 async function requestCaptchaSteps(
