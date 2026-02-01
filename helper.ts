@@ -3,7 +3,7 @@ import { processCodegen } from "./helper-lib";
 const USAGE = `garden helper
 
 Usage:
-  bun helper.ts record [url] [--upload-to <baseUrl>] [--site-id <id>]
+  bun helper.ts record [url] [--upload-to <baseUrl>] [--site-id <id>] [--insecure]
 
 Commands:
   record    Launch Playwright codegen, then print recorded script JSON.
@@ -19,7 +19,12 @@ if (!command || command === "help" || command === "--help") {
 
 if (command === "record") {
   const recordArgs = parseRecordArgs(args.slice(1));
-  await recordCodegen(recordArgs.url, recordArgs.uploadTo, recordArgs.siteId);
+  await recordCodegen(
+    recordArgs.url,
+    recordArgs.uploadTo,
+    recordArgs.siteId,
+    recordArgs.insecure,
+  );
   process.exit(0);
 }
 
@@ -30,6 +35,7 @@ async function recordCodegen(
   url?: string,
   uploadTo?: string,
   siteId?: number,
+  insecure?: boolean,
 ) {
   const tmpDir = process.env.TMPDIR ?? "/tmp";
   const outputPath = `${tmpDir}/garden-codegen-${Date.now()}.js`;
@@ -69,7 +75,7 @@ async function recordCodegen(
 
   const recorded = await processCodegen(text);
   if (uploadTo && siteId) {
-    await uploadScript(uploadTo, siteId, recorded);
+    await uploadScript(uploadTo, siteId, recorded, insecure);
     console.log(`Uploaded script for site ${siteId} to ${uploadTo}.`);
   } else {
     console.log(JSON.stringify(recorded, null, 2));
@@ -80,6 +86,7 @@ function parseRecordArgs(rawArgs: string[]) {
   let url: string | undefined;
   let uploadTo: string | undefined;
   let siteId: number | undefined;
+  let insecure = false;
 
   for (let i = 0; i < rawArgs.length; i += 1) {
     const arg = rawArgs[i];
@@ -100,20 +107,31 @@ function parseRecordArgs(rawArgs: string[]) {
       continue;
     }
 
+    if (arg === "--insecure") {
+      insecure = true;
+      continue;
+    }
+
     if (!arg.startsWith("--") && !url) {
       url = arg;
     }
   }
 
-  return { url, uploadTo, siteId };
+  return { url, uploadTo, siteId, insecure };
 }
 
-async function uploadScript(uploadTo: string, siteId: number, script: object) {
+async function uploadScript(
+  uploadTo: string,
+  siteId: number,
+  script: object,
+  insecure?: boolean,
+) {
   const base = uploadTo.replace(/\/$/, "");
   const res = await fetch(`${base}/api/scripts`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ siteId, script }),
+    ...(insecure ? { tls: { rejectUnauthorized: false } } : {}),
   });
   if (!res.ok) {
     const body = await res.text();
