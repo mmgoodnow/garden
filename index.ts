@@ -93,7 +93,6 @@ Bun.serve({
           .innerJoin("runs", "runs.id", "screenshots.run_id")
           .select([
             "screenshots.id as id",
-            "screenshots.path as path",
             "screenshots.created_at as created_at",
           ])
           .where("runs.site_id", "=", siteId)
@@ -191,8 +190,8 @@ Bun.serve({
         if (!shot) {
           return new Response("Not found", { status: 404 });
         }
-        return new Response(Bun.file(shot.path), {
-          headers: { "Content-Type": "image/png" },
+        return new Response(shot.data, {
+          headers: { "Content-Type": shot.mime_type || "image/png" },
         });
       },
     },

@@ -1,8 +1,6 @@
 import { chromium, type Locator, type Page } from "playwright";
 import { db } from "./db";
 import { decryptSecret } from "./crypto";
-import { ensureDir } from "./util";
-import { SCREENSHOT_DIR } from "./config";
 import { parseScript, type RecordedScript, type Step } from "./script";
 
 type SecretValues = {
@@ -272,15 +270,14 @@ function extractNameOption(input: string): string | null {
 
 async function captureScreenshot(runId: number, page: Page) {
   if (!runId) return;
-  ensureDir(SCREENSHOT_DIR);
-  const path = `${SCREENSHOT_DIR}/run-${runId}.png`;
-  await page.screenshot({ path, fullPage: true });
+  const data = await page.screenshot({ fullPage: true, type: "png" });
 
   await db
     .insertInto("screenshots")
     .values({
       run_id: runId,
-      path,
+      data,
+      mime_type: "image/png",
       created_at: new Date().toISOString(),
     })
     .execute();

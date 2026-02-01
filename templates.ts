@@ -26,7 +26,6 @@ type ScriptRow = {
 
 type ScreenshotRow = {
   id: number;
-  path: string;
   created_at: string;
 };
 

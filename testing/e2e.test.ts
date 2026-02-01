@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { randomBytes } from "node:crypto";
-import { mkdtempSync, rmSync, existsSync, statSync } from "node:fs";
+import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -21,7 +21,6 @@ test(
     const tempDir = mkdtempSync(join(tmpdir(), "garden-test-"));
     const dataDir = join(tempDir, "data");
     const dbPath = join(dataDir, "garden.db");
-    const screenshotDir = join(dataDir, "screenshots");
     const serverPort = await findFreePort();
     const mockPort = await findFreePort();
 
@@ -38,7 +37,6 @@ test(
           PORT: String(serverPort),
           DATA_DIR: dataDir,
           DB_PATH: dbPath,
-          SCREENSHOT_DIR: screenshotDir,
         },
         stdout: "pipe",
         stderr: "pipe",
@@ -73,9 +71,8 @@ test(
       expect(run.status).toBe("success");
       expect(run.error).toBeNull();
 
-      const shotPath = await waitForScreenshot(dbPath, run.id, 10000);
-      expect(existsSync(shotPath)).toBe(true);
-      expect(statSync(shotPath).size).toBeGreaterThan(0);
+      const shotSize = await waitForScreenshot(dbPath, run.id, 10000);
+      expect(shotSize).toBeGreaterThan(0);
     } finally {
       try {
         serverProc?.kill();
@@ -215,11 +212,11 @@ async function waitForScreenshot(dbPath: string, runId: number, timeoutMs = 1000
     while (Date.now() - start < timeoutMs) {
       const row = db
         .query(
-          "select path from screenshots where run_id = ? order by id desc limit 1",
+          "select length(data) as size from screenshots where run_id = ? order by id desc limit 1",
         )
-        .get(runId) as { path: string } | undefined;
-      if (row?.path) {
-        return row.path;
+        .get(runId) as { size: number } | undefined;
+      if (row?.size) {
+        return row.size;
       }
       await delay(250);
     }

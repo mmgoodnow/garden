@@ -66,7 +66,7 @@ curl -i -s -X POST http://localhost:3000/sites/${SITE_ID}/run
 5) Verify the result:
 
 - Visit `http://localhost:3000/sites/${SITE_ID}` to see run status and screenshots.
-- Confirm a screenshot exists under `data/screenshots`.
+- The screenshot is stored in the database (use the UI link to view it).
 
 ## Notes
 

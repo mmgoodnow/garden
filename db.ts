@@ -39,7 +39,8 @@ export type RunsTable = {
 export type ScreenshotsTable = {
   id: Generated<number>;
   run_id: number;
-  path: string;
+  data: Uint8Array;
+  mime_type: string;
   created_at: string;
 };
 
@@ -106,7 +107,8 @@ export async function initDb() {
     .ifNotExists()
     .addColumn("id", "integer", (col) => col.primaryKey().autoIncrement())
     .addColumn("run_id", "integer", (col) => col.notNull())
-    .addColumn("path", "text", (col) => col.notNull())
+    .addColumn("data", "blob", (col) => col.notNull())
+    .addColumn("mime_type", "text", (col) => col.notNull())
     .addColumn("created_at", "text", (col) => col.notNull())
     .execute();
 }
