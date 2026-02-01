@@ -39,46 +39,71 @@ export function layout(title: string, body: string) {
     <title>${escapeHtml(title)}</title>
     <style>
       :root {
-        color-scheme: light;
+        color-scheme: light dark;
         --bg: #f6f4f1;
         --panel: #ffffff;
+        --panel-2: #faf8f5;
         --ink: #1b1b1b;
         --muted: #6b6b6b;
         --accent: #1f7a5c;
+        --accent-ink: #ffffff;
         --border: #e1ddd6;
+        --shadow: 0 10px 24px rgba(20, 15, 10, 0.08);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0f1210;
+          --panel: #171b18;
+          --panel-2: #121613;
+          --ink: #f3f2ef;
+          --muted: #a4a8a2;
+          --accent: #4bb891;
+          --accent-ink: #0d120f;
+          --border: #2a2f2b;
+          --shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+        }
       }
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        background: var(--bg);
+        background: radial-gradient(1200px 600px at 20% -10%, rgba(31, 122, 92, 0.18), transparent 60%),
+          var(--bg);
         color: var(--ink);
         font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
       }
       header {
-        padding: 24px 32px;
+        padding: 20px 28px;
         border-bottom: 1px solid var(--border);
         background: var(--panel);
+        position: sticky;
+        top: 0;
+        z-index: 10;
       }
       header h1 {
         margin: 0;
         font-size: 22px;
+        letter-spacing: 0.2px;
       }
       main {
-        padding: 24px 32px 48px;
+        padding: 28px 28px 56px;
         display: flex;
         flex-direction: column;
         gap: 20px;
+        max-width: 1120px;
+        margin: 0 auto;
       }
       nav a {
         color: var(--accent);
         text-decoration: none;
         margin-right: 12px;
+        font-weight: 600;
       }
       section {
         background: var(--panel);
         border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 16px;
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: var(--shadow);
       }
       table {
         width: 100%;
@@ -86,18 +111,16 @@ export function layout(title: string, body: string) {
       }
       th, td {
         text-align: left;
-        padding: 8px 6px;
+        padding: 10px 8px;
         border-bottom: 1px solid var(--border);
       }
       th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+      tr:last-child td { border-bottom: none; }
       .muted { color: var(--muted); }
       .row {
-        display: flex;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 16px;
-        flex-wrap: wrap;
-      }
-      .row > section {
-        flex: 1 1 320px;
       }
       label { display: block; font-size: 12px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
       input, textarea, button, select {
@@ -107,13 +130,23 @@ export function layout(title: string, body: string) {
         border-radius: 8px;
         border: 1px solid var(--border);
         font-family: inherit;
+        background: var(--panel-2);
+        color: var(--ink);
+      }
+      input:focus, textarea:focus, select:focus {
+        outline: 2px solid color-mix(in srgb, var(--accent), transparent 60%);
+        border-color: var(--accent);
       }
       button {
         background: var(--accent);
-        color: white;
+        color: var(--accent-ink);
         border: none;
         cursor: pointer;
+        padding: 10px 12px;
+        font-weight: 600;
+        transition: transform 120ms ease, box-shadow 120ms ease;
       }
+      button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
       button.secondary {
         background: transparent;
         color: var(--accent);
@@ -121,12 +154,16 @@ export function layout(title: string, body: string) {
       }
       pre {
         white-space: pre-wrap;
-        background: #faf8f5;
+        background: var(--panel-2);
         border: 1px solid var(--border);
         padding: 12px;
         border-radius: 8px;
         max-height: 320px;
         overflow: auto;
+      }
+      @media (max-width: 720px) {
+        header { padding: 16px 18px; }
+        main { padding: 20px 18px 44px; }
       }
     </style>
   </head>
