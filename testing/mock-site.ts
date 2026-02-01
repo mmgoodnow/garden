@@ -100,10 +100,25 @@ function captchaPage(message = "") {
       <main>
         <h1>Captcha Check</h1>
         <section id="captcha" data-testid="captcha">
-          <p>Please click Verify to continue.</p>
-          <img src="/captcha-image" alt="captcha grid" />
+          <p>Which movie does this poster belong to?</p>
+          <img src="/captcha-image" alt="Movie poster" />
           ${banner}
           <form method="post" action="/captcha">
+            <fieldset>
+              <legend>Pick one</legend>
+              <label>
+                <input type="radio" name="movie" value="moonlight" checked />
+                Moonlight Bay
+              </label>
+              <label>
+                <input type="radio" name="movie" value="sunset" />
+                Sunset Drive
+              </label>
+              <label>
+                <input type="radio" name="movie" value="evergreen" />
+                Evergreen Lane
+              </label>
+            </fieldset>
             <button id="verify" type="submit">Verify</button>
           </form>
         </section>
