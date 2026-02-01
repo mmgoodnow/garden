@@ -184,88 +184,21 @@ async function annotateCaptcha(
     return null;
   }
 
-  console.log("\nCaptcha annotation mode");
-  console.log("j/k or n/p: move   c: mark start   C: mark end   Enter: finish\n");
+  const start = await pickStepIndex("Where does the captcha start?", steps, 0);
+  if (start === null) {
+    return null;
+  }
 
-  let index = 0;
-  let start: number | null = null;
-  let end: number | null = null;
+  const end = await pickStepIndex("Where does the captcha end?", steps, start);
+  if (end === null) {
+    return null;
+  }
 
-  const stdin = process.stdin;
-  const wasRaw = stdin.isRaw;
-  stdin.setRawMode(true);
-  stdin.resume();
-  stdin.setEncoding("utf8");
-
-  const render = () => {
-    const step = steps[index];
-    const summary = summarizeStep(step);
-    const startTag = start === index ? " [start]" : "";
-    const endTag = end === index ? " [end]" : "";
-    process.stdout.write(
-      `\r[${index + 1}/${steps.length}] ${summary}${startTag}${endTag}   `,
-    );
-  };
-
-  render();
-
-  return await new Promise((resolve) => {
-    const finish = () => {
-      stdin.off("data", onData);
-      stdin.setRawMode(wasRaw ?? false);
-      stdin.pause();
-      process.stdout.write("\n");
-
-      if (start === null || end === null) {
-        resolve(null);
-        return;
-      }
-
-      const from = Math.min(start, end);
-      const to = Math.max(start, end);
-      const range = [];
-      for (let i = from; i <= to; i += 1) range.push(i);
-      resolve(range);
-    };
-
-    const onData = (chunk: string) => {
-      if (chunk === "\u0003") {
-        finish();
-        return;
-      }
-
-      if (chunk === "\r" || chunk === "\n") {
-        finish();
-        return;
-      }
-
-      if (chunk === "j" || chunk === "n" || chunk === "\u001b[C") {
-        if (index < steps.length - 1) index += 1;
-        render();
-        return;
-      }
-
-      if (chunk === "k" || chunk === "p" || chunk === "\u001b[D") {
-        if (index > 0) index -= 1;
-        render();
-        return;
-      }
-
-      if (chunk === "c") {
-        start = index;
-        render();
-        return;
-      }
-
-      if (chunk === "C") {
-        end = index;
-        render();
-        return;
-      }
-    };
-
-    stdin.on("data", onData);
-  });
+  const from = Math.min(start, end);
+  const to = Math.max(start, end);
+  const range = [];
+  for (let i = from; i <= to; i += 1) range.push(i);
+  return range;
 }
 
 function summarizeStep(step: RecordedStep): string {
@@ -294,5 +227,97 @@ function promptLine(question: string): Promise<string> {
       resolve(data.toString().trim());
     };
     process.stdin.on("data", onData);
+  });
+}
+
+async function pickStepIndex(
+  title: string,
+  steps: RecordedStep[],
+  initialIndex: number,
+): Promise<number | null> {
+  const stdin = process.stdin;
+  if (!stdin.isTTY) return null;
+
+  let index = Math.min(Math.max(initialIndex, 0), steps.length - 1);
+  const wasRaw = stdin.isRaw;
+  stdin.setRawMode(true);
+  stdin.resume();
+  stdin.setEncoding("utf8");
+
+  const windowSize = 12;
+
+  const render = () => {
+    process.stdout.write("\x1b[2J\x1b[H");
+    console.log(title);
+    console.log("Use up/down or j/k. Enter to select. q to cancel.");
+    console.log("");
+
+    const half = Math.floor(windowSize / 2);
+    let start = Math.max(0, index - half);
+    let end = Math.min(steps.length, start + windowSize);
+    if (end - start < windowSize) {
+      start = Math.max(0, end - windowSize);
+    }
+
+    if (start > 0) {
+      console.log("  ...");
+    }
+
+    for (let i = start; i < end; i += 1) {
+      const summary = summarizeStep(steps[i]);
+      if (i === index) {
+        console.log("  ------------------------------------------------------------");
+        console.log(`  >> ${i + 1}. ${summary}`);
+      } else {
+        console.log(`     ${i + 1}. ${summary}`);
+      }
+    }
+
+    if (end < steps.length) {
+      console.log("  ...");
+    }
+  };
+
+  render();
+
+  return await new Promise((resolve) => {
+    const finish = (value: number | null) => {
+      stdin.off("data", onData);
+      stdin.setRawMode(wasRaw ?? false);
+      stdin.pause();
+      process.stdout.write("\n");
+      resolve(value);
+    };
+
+    const onData = (chunk: string) => {
+      if (chunk === "\u0003") {
+        finish(null);
+        return;
+      }
+
+      if (chunk === "\r" || chunk === "\n") {
+        finish(index);
+        return;
+      }
+
+      if (chunk === "q") {
+        finish(null);
+        return;
+      }
+
+      if (chunk === "j" || chunk === "n" || chunk === "\u001b[B") {
+        if (index < steps.length - 1) index += 1;
+        render();
+        return;
+      }
+
+      if (chunk === "k" || chunk === "p" || chunk === "\u001b[A") {
+        if (index > 0) index -= 1;
+        render();
+        return;
+      }
+    };
+
+    stdin.on("data", onData);
   });
 }
