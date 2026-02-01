@@ -259,11 +259,7 @@ export function renderSiteDetail(
   const scriptContent = script ? escapeHtml(script.content) : "";
   const domain = site.domain.trim();
   const hasScheme = /^https?:\/\//i.test(domain);
-  const isLocal =
-    domain.includes("localhost") ||
-    domain.startsWith("127.") ||
-    domain.startsWith("0.0.0.0");
-  const siteUrl = hasScheme ? domain : `${isLocal ? "http" : "https"}://${domain}`;
+  const siteUrl = hasScheme ? domain : `https://${domain}`;
   const runRows = runs
     .map(
       (run) => `<tr>
