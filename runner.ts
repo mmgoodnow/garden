@@ -58,10 +58,11 @@ export async function runSite(siteId: number) {
     runId = Number(fallback?.id ?? 0);
   }
   const startedAt = Date.now();
+  console.log(`[runner] starting run ${runId} for site ${siteId}`);
 
   try {
     const secrets = buildSecrets(site.username_enc, site.password_enc, script);
-    await runScript(script, secrets, runId);
+    await runScriptWithRetries(script, secrets, runId);
 
     const duration = Date.now() - startedAt;
     await db
@@ -85,9 +86,11 @@ export async function runSite(siteId: number) {
       })
       .where("id", "=", siteId)
       .execute();
+    console.log(`[runner] run ${runId} success (${duration}ms)`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const duration = Date.now() - startedAt;
+    console.error(`[runner] run ${runId} failed (${duration}ms): ${message}`);
     await db
       .updateTable("runs")
       .set({
@@ -133,9 +136,38 @@ async function runScript(
   }
 }
 
+async function runScriptWithRetries(
+  script: RecordedScript,
+  secrets: SecretValues,
+  runId: number,
+) {
+  const retries = Number.parseInt(process.env.RUNNER_MAX_RETRIES ?? "1", 10);
+  const delayMs = Number.parseInt(process.env.RUNNER_RETRY_DELAY_MS ?? "2000", 10);
+  const attempts = Number.isFinite(retries) && retries > 0 ? retries + 1 : 1;
+
+  let lastError: unknown = null;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    console.log(`[runner] run ${runId} attempt ${attempt}/${attempts}`);
+    try {
+      await runScript(script, secrets, runId);
+      return;
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(`[runner] run ${runId} attempt ${attempt} failed: ${message}`);
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 async function runStep(page: Page, step: Step, secrets: SecretValues) {
   if (step.type === "captcha") {
-    throw new Error("Captcha step requires a solver (not implemented yet).");
+    await solveCaptcha(page, step, secrets);
+    return;
   }
 
   if (step.type === "goto" && step.url) {
@@ -182,6 +214,15 @@ async function runStep(page: Page, step: Step, secrets: SecretValues) {
     return locator.selectOption(value);
   }
 }
+
+type CaptchaModelStep = {
+  type: string;
+  locator?: string;
+  selector?: string;
+  url?: string;
+  value?: string;
+  args?: string;
+};
 
 function resolveValue(value: string | undefined, secrets: SecretValues) {
   if (!value) return value;
@@ -266,6 +307,253 @@ function extractFirstStringLiteral(input: string): string | null {
 function extractNameOption(input: string): string | null {
   const match = input.match(/name:\s*(['"`])((?:\\.|(?!\1).)*)\1/);
   return match ? match[2] : null;
+}
+
+async function solveCaptcha(
+  page: Page,
+  step: Step & { type: "captcha" },
+  secrets: SecretValues,
+) {
+  const target =
+    step.steps.find((child) => child.type === "click" && child.locator) ??
+    step.steps.find((child) => child.locator);
+
+  if (!target?.locator) {
+    throw new Error("Captcha step missing an initial click locator.");
+  }
+
+  const locator = resolveLocator(page, target.locator);
+  await locator.scrollIntoViewIfNeeded();
+
+  const html = await locator.evaluate((el) => el.outerHTML);
+  const imageSrcs = await locator.evaluate((el) =>
+    Array.from(el.querySelectorAll("img"))
+      .map((img) => img.getAttribute("src"))
+      .filter((src): src is string => Boolean(src)),
+  );
+  const resolvedImages = await resolveImageAssets(page, imageSrcs);
+  const { htmlWithMarkers, imageInputs, imageMap } = buildCaptchaPayload(
+    html,
+    resolvedImages,
+  );
+
+  const modelSteps = await requestCaptchaSteps(
+    page.url(),
+    htmlWithMarkers,
+    imageInputs,
+    imageMap,
+  );
+
+  if (!modelSteps.length) {
+    throw new Error("Captcha solver returned no steps.");
+  }
+
+  for (const modelStep of modelSteps) {
+    const normalized = normalizeCaptchaStep(modelStep);
+    await runStep(page, normalized, secrets);
+  }
+}
+
+type ResolvedImage = {
+  originalSrc: string;
+  dataUrl: string;
+  label: string;
+};
+
+async function resolveImageAssets(
+  page: Page,
+  imageSrcs: string[],
+): Promise<ResolvedImage[]> {
+  const unique = Array.from(new Set(imageSrcs)).filter(Boolean);
+  const resolved: ResolvedImage[] = [];
+  const limit = 8;
+
+  for (const [index, src] of unique.slice(0, limit).entries()) {
+    let absolute: string;
+    try {
+      absolute = new URL(src, page.url()).toString();
+    } catch {
+      continue;
+    }
+
+    const response = await page.request.get(absolute);
+    if (!response.ok()) continue;
+
+    const contentType = response.headers()["content-type"] ?? "image/png";
+    const buffer = await response.body();
+    const dataUrl = `data:${contentType};base64,${Buffer.from(buffer).toString(
+      "base64",
+    )}`;
+
+    resolved.push({
+      originalSrc: src,
+      dataUrl,
+      label: `image-${index + 1}`,
+    });
+  }
+
+  return resolved;
+}
+
+function buildCaptchaPayload(html: string, images: ResolvedImage[]) {
+  let htmlWithMarkers = html;
+  for (const image of images) {
+    htmlWithMarkers = htmlWithMarkers.split(image.originalSrc).join(image.label);
+  }
+
+  const imageInputs: Array<{ type: "input_image"; image_url: string }> = images.map(
+    (image) => ({
+      type: "input_image",
+      image_url: image.dataUrl,
+    }),
+  );
+  const imageMap = images
+    .map((image) => `- ${image.label}: ${image.originalSrc}`)
+    .join("\n");
+
+  return { htmlWithMarkers, imageInputs, imageMap };
+}
+
+async function requestCaptchaSteps(
+  pageUrl: string,
+  html: string,
+  imageInputs: Array<{ type: "input_image"; image_url: string }>,
+  imageMap: string,
+): Promise<CaptchaModelStep[]> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is required to solve captcha steps.");
+  }
+
+  const model = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+  const instructions = [
+    "You are helping automate captcha completion inside a web page.",
+    "Return ONLY JSON matching the provided schema.",
+    "Use CSS selectors for locator fields (e.g. '#submit', '.tile:nth-child(2)').",
+    "Only include the actions required to solve the captcha and proceed.",
+  ].join(" ");
+
+  const userText = [
+    `Page URL: ${pageUrl}`,
+    "",
+    "HTML fragment for the captcha section:",
+    html,
+    "",
+    imageMap ? "Image map:" : "No images found in fragment.",
+    imageMap || "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const payload = {
+    model,
+    input: [
+      {
+        role: "developer",
+        content: [{ type: "input_text", text: instructions }],
+      },
+      {
+        role: "user",
+        content: [{ type: "input_text", text: userText }, ...imageInputs],
+      },
+    ],
+    text: {
+      format: {
+        type: "json_schema",
+        name: "captcha_steps",
+        strict: true,
+        schema: {
+          type: "object",
+          additionalProperties: false,
+          properties: {
+            steps: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                properties: {
+                  type: { type: "string" },
+                  locator: { type: "string" },
+                  selector: { type: "string" },
+                  url: { type: "string" },
+                  value: { type: "string" },
+                  args: { type: "string" },
+                },
+                required: ["type"],
+              },
+            },
+          },
+          required: ["steps"],
+        },
+      },
+    },
+  };
+
+  const response = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`OpenAI captcha request failed: ${response.status} ${errorText}`);
+  }
+
+  const data = await response.json();
+  const outputText = extractOutputText(data);
+  if (!outputText) {
+    throw new Error("OpenAI captcha response missing output text.");
+  }
+
+  const parsed = JSON.parse(outputText);
+  if (!parsed || !Array.isArray(parsed.steps)) {
+    throw new Error("OpenAI captcha response did not include steps.");
+  }
+
+  return parsed.steps as CaptchaModelStep[];
+}
+
+function extractOutputText(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const record = payload as {
+    output_text?: string;
+    output?: Array<{
+      type?: string;
+      content?: Array<{ type?: string; text?: string }>;
+    }>;
+  };
+  if (typeof record.output_text === "string") {
+    return record.output_text;
+  }
+  const message = record.output?.find((item) => item.type === "message");
+  const content = message?.content?.find((item) => item.type === "output_text");
+  return content?.text ?? "";
+}
+
+function normalizeCaptchaStep(step: CaptchaModelStep): Step {
+  if (step.type === "captcha") {
+    throw new Error("Captcha solver returned nested captcha step.");
+  }
+
+  if (step.type === "goto") {
+    return { type: "goto", url: step.url ?? "" };
+  }
+
+  const locator = step.locator ?? step.selector;
+  if (!locator) {
+    throw new Error(`Captcha step missing locator for ${step.type}.`);
+  }
+
+  return {
+    type: step.type,
+    locator,
+    value: step.value,
+    args: step.args,
+  };
 }
 
 async function captureScreenshot(runId: number, page: Page) {
