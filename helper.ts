@@ -1,4 +1,4 @@
-type RecordedStep = {
+type ActionStep = {
   type: string;
   locator?: string;
   url?: string;
@@ -6,14 +6,20 @@ type RecordedStep = {
   args?: string;
 };
 
+type CaptchaStep = {
+  type: "captcha";
+  steps: ActionStep[];
+};
+
+type Step = ActionStep | CaptchaStep;
+
 type RecordedScript = {
   meta: {
     source: "playwright-codegen";
     version: number;
     recordedAt: string;
   };
-  steps: RecordedStep[];
-  captchaSteps?: number[];
+  steps: Step[];
 };
 
 const USAGE = `garden helper
@@ -80,15 +86,12 @@ async function recordCodegen(url?: string) {
   }
 
   const recorded = parseCodegen(text);
-  const captchaSteps = await annotateCaptcha(recorded.steps);
-  if (captchaSteps && captchaSteps.length > 0) {
-    recorded.captchaSteps = captchaSteps;
-  }
+  recorded.steps = await annotateCaptcha(recorded.steps);
   console.log(JSON.stringify(recorded, null, 2));
 }
 
 function parseCodegen(text: string): RecordedScript {
-  const steps: RecordedStep[] = [];
+  const steps: ActionStep[] = [];
   const lines = text.split(/\r?\n/);
   const actions = new Set([
     "click",
@@ -120,7 +123,7 @@ function parseCodegen(text: string): RecordedScript {
     const [, target, action, rawArgs] = match;
     if (!actions.has(action)) continue;
 
-    const step: RecordedStep = {
+    const step: ActionStep = {
       type: action,
       locator: target,
     };
@@ -137,7 +140,7 @@ function parseCodegen(text: string): RecordedScript {
     steps.push(step);
   }
 
-  const deduped: RecordedStep[] = [];
+  const deduped: ActionStep[] = [];
   for (const step of steps) {
     const prev = deduped[deduped.length - 1];
     if (
@@ -167,16 +170,14 @@ function extractFirstStringLiteral(input: string): string | null {
   return match ? match[2] : null;
 }
 
-async function annotateCaptcha(
-  steps: RecordedStep[],
-): Promise<number[] | null> {
+async function annotateCaptcha(steps: ActionStep[]): Promise<Step[]> {
   if (!process.stdin.isTTY) {
-    return null;
+    return steps;
   }
 
   if (steps.length === 0) {
     console.log("No steps to annotate.");
-    return null;
+    return steps;
   }
 
   const start = await pickStepIndex(
@@ -185,7 +186,7 @@ async function annotateCaptcha(
     0,
   );
   if (start === null) {
-    return null;
+    return steps;
   }
 
   const end = await pickStepIndex(
@@ -195,17 +196,27 @@ async function annotateCaptcha(
     start,
   );
   if (end === null) {
-    return null;
+    return steps;
   }
 
   const from = Math.min(start, end);
   const to = Math.max(start, end);
-  const range = [];
-  for (let i = from; i <= to; i += 1) range.push(i);
-  return range;
+  const captchaSteps = steps.slice(from, to + 1);
+  if (captchaSteps.length === 0) {
+    return steps;
+  }
+
+  const updated: Step[] = [];
+  updated.push(...steps.slice(0, from));
+  updated.push({ type: "captcha", steps: captchaSteps });
+  updated.push(...steps.slice(to + 1));
+  return updated;
 }
 
-function summarizeStep(step: RecordedStep): string {
+function summarizeStep(step: ActionStep | CaptchaStep): string {
+  if (step.type === "captcha") {
+    return `captcha (${step.steps.length} steps)`;
+  }
   if (step.type === "goto" && step.url) {
     return `goto ${truncate(step.url, 80)}`;
   }
@@ -236,7 +247,7 @@ function promptLine(question: string): Promise<string> {
 
 async function pickStepIndex(
   title: string,
-  steps: RecordedStep[],
+  steps: ActionStep[],
   initialIndex: number,
   highlightIndex?: number,
 ): Promise<number | null> {
