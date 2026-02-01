@@ -1,0 +1,17 @@
+services:
+  garden:
+    build: .
+    ports:
+      - "80:80"
+    environment:
+      APP_ENC_KEY_BASE64: ${APP_ENC_KEY_BASE64}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      SCHEDULER_ENABLED: "1"
+      SCHEDULER_INTERVAL_MINUTES: "360"
+      SCHEDULE_EVERY_DAYS: "30"
+      RUNNER_MAX_RETRIES: "1"
+      RUNNER_RETRY_DELAY_MS: "2000"
+    volumes:
+      - ./config:/config
+    restart: unless-stopped
