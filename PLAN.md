@@ -20,6 +20,12 @@
 - [ ] Capture screenshot after login and store metadata
 - [ ] Track runs + last success/failure
 
+## Validation & Local Test Harness
+- [ ] Add a mock login site (simple form + session cookie) for repeatable tests
+- [ ] Document curl flow to create a site, upload script JSON, set credentials, run job
+- [ ] Verify runner works end-to-end with the mock site
+- [ ] Note elevated permissions may be required to bind to ports in sandboxed environments
+
 ## UI (SSR)
 - [ ] Dashboard: sites list with last run status
 - [ ] Site detail: script summary, run history, screenshots
