@@ -88,9 +88,7 @@ export async function runSite(siteId: number) {
       .execute();
     console.log(`[runner] run ${runId} success (${duration}ms)`);
   } catch (error) {
-    const message = normalizeRunError(
-      error instanceof Error ? error.message : String(error),
-    );
+    const message = error instanceof Error ? error.message : String(error);
     const duration = Date.now() - startedAt;
     console.error(`[runner] run ${runId} failed (${duration}ms): ${message}`);
     await db
@@ -672,16 +670,4 @@ async function captureScreenshot(runId: number, page: Page) {
       created_at: new Date().toISOString(),
     })
     .execute();
-}
-
-function normalizeRunError(message: string) {
-  if (!message) return message;
-  if (
-    message.includes("Executable doesn't exist") ||
-    message.includes("playwright install") ||
-    message.includes("chromium_headless_shell")
-  ) {
-    return "Playwright browsers missing in image. Rebuild the container to install browsers.";
-  }
-  return message;
 }
