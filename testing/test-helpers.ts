@@ -116,36 +116,21 @@ export function buildMockScript(mockPort: number) {
         type: "click",
         locator: "page.getByRole('button', { name: 'Sign in' })",
       },
+      {
+        type: "captcha",
+        steps: [
+          {
+            type: "click",
+            locator: "#captcha",
+          },
+        ],
+      },
       { type: "goto", url: `http://localhost:${mockPort}/dashboard` },
     ],
     secrets: [
       { placeholder: "{{username}}", kind: "username" },
       { placeholder: "{{password}}", kind: "password" },
     ],
-  };
-}
-
-export function buildCaptchaScript(mockPort: number) {
-  return {
-    meta: {
-      source: "mock-captcha-test",
-      version: 1,
-      recordedAt: new Date().toISOString(),
-    },
-    steps: [
-      { type: "goto", url: `http://localhost:${mockPort}/captcha` },
-      {
-        type: "captcha",
-        steps: [
-          {
-            type: "click",
-            locator: "page.getByRole('button', { name: 'Verify' })",
-          },
-        ],
-      },
-      { type: "goto", url: `http://localhost:${mockPort}/dashboard` },
-    ],
-    secrets: [],
   };
 }
 

@@ -193,17 +193,22 @@ async function mapSecretKinds(secrets: SecretSpec[], steps: Step[]): Promise<Sec
   let prompted = false;
   for (const secret of secrets) {
     const hint = findSecretHint(secret.placeholder, steps);
+    const normalizedHint = hint.toLowerCase();
 
-    if (hint.includes("pass") || hint.includes("pwd") || hint.includes("password")) {
+    if (
+      normalizedHint.includes("pass") ||
+      normalizedHint.includes("pwd") ||
+      normalizedHint.includes("password")
+    ) {
       secret.kind = "password";
       continue;
     }
 
     if (
-      hint.includes("user") ||
-      hint.includes("email") ||
-      hint.includes("login") ||
-      hint.includes("username")
+      normalizedHint.includes("user") ||
+      normalizedHint.includes("email") ||
+      normalizedHint.includes("login") ||
+      normalizedHint.includes("username")
     ) {
       secret.kind = "username";
       continue;

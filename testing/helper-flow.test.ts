@@ -24,6 +24,9 @@ await page.goto('http://localhost:${env.mockPort}/login');
 await page.getByLabel('Username').fill('test@example.com');
 await page.getByLabel('Password').fill('password123');
 await page.getByRole('button', { name: 'Sign in' }).click();
+await page.goto('http://localhost:${env.mockPort}/captcha');
+await page.locator('#movie-nosferatu').check();
+await page.getByRole('button', { name: 'Verify' }).click();
 await page.goto('http://localhost:${env.mockPort}/dashboard');
 `;
 
