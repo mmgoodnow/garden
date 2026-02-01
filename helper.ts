@@ -6,6 +6,15 @@ type ActionStep = {
   args?: string;
 };
 
+type SecretKind = "username" | "password" | "secret";
+
+type SecretSpec = {
+  placeholder: string;
+  kind: SecretKind;
+  action?: string;
+  locator?: string;
+};
+
 type CaptchaStep = {
   type: "captcha";
   steps: ActionStep[];
@@ -20,6 +29,7 @@ type RecordedScript = {
     recordedAt: string;
   };
   steps: Step[];
+  secrets: SecretSpec[];
 };
 
 const USAGE = `garden helper
@@ -86,7 +96,10 @@ async function recordCodegen(url?: string) {
   }
 
   const recorded = parseCodegen(text);
-  recorded.steps = await annotateCaptcha(recorded.steps);
+  const redacted = redactSecrets(recorded.steps);
+  const annotated = await annotateCaptcha(redacted.steps);
+  recorded.steps = annotated;
+  recorded.secrets = await mapSecretKinds(redacted.secrets);
   console.log(JSON.stringify(recorded, null, 2));
 }
 
@@ -162,6 +175,7 @@ function parseCodegen(text: string): RecordedScript {
       recordedAt: new Date().toISOString(),
     },
     steps: deduped,
+    secrets: [],
   };
 }
 
@@ -211,6 +225,61 @@ async function annotateCaptcha(steps: ActionStep[]): Promise<Step[]> {
   updated.push({ type: "captcha", steps: captchaSteps });
   updated.push(...steps.slice(to + 1));
   return updated;
+}
+
+function redactSecrets(steps: ActionStep[]): {
+  steps: ActionStep[];
+  secrets: SecretSpec[];
+} {
+  let counter = 0;
+  const secrets: SecretSpec[] = [];
+
+  const redactedSteps = steps.map((step) => {
+    if ((step.type === "fill" || step.type === "type") && step.value) {
+      counter += 1;
+      const placeholder = `{{secret_${counter}}}`;
+      secrets.push({
+        placeholder,
+        kind: "secret",
+        action: step.type,
+        locator: step.locator,
+      });
+      return {
+        ...step,
+        value: placeholder,
+      };
+    }
+
+    return step;
+  });
+
+  return { steps: redactedSteps, secrets };
+}
+
+async function mapSecretKinds(secrets: SecretSpec[]): Promise<SecretSpec[]> {
+  if (!process.stdin.isTTY || secrets.length === 0) {
+    return secrets;
+  }
+
+  console.log("\nMap secret placeholders:");
+  for (const secret of secrets) {
+    const source = formatSecretSource(secret);
+    const answer = await promptLine(
+      `  ${secret.placeholder} from ${source} [u=username, p=password, s=secret]: `,
+    );
+    const normalized = answer.trim().toLowerCase();
+    if (normalized === "u") secret.kind = "username";
+    else if (normalized === "p") secret.kind = "password";
+    else secret.kind = "secret";
+  }
+
+  return secrets;
+}
+
+function formatSecretSource(secret: SecretSpec): string {
+  const action = secret.action ?? "action";
+  const locator = secret.locator ? truncate(secret.locator, 50) : "unknown";
+  return `${action} ${locator}`;
 }
 
 function summarizeStep(step: ActionStep | CaptchaStep): string {
