@@ -99,7 +99,7 @@ async function recordCodegen(url?: string) {
   const annotated = await annotateCaptcha(recorded.steps);
   const redacted = redactSecrets(annotated);
   recorded.steps = redacted.steps;
-  recorded.secrets = await mapSecretKinds(redacted.secrets);
+  recorded.secrets = mapSecretKinds(redacted.secrets);
   console.log(JSON.stringify(recorded, null, 2));
 }
 
@@ -260,30 +260,35 @@ function redactSecrets(steps: Step[]): {
   return { steps: redactedSteps, secrets };
 }
 
-async function mapSecretKinds(secrets: SecretSpec[]): Promise<SecretSpec[]> {
-  if (!process.stdin.isTTY || secrets.length === 0) {
-    return secrets;
-  }
-
-  console.log("\nMap secret placeholders:");
+function mapSecretKinds(secrets: SecretSpec[]): SecretSpec[] {
   for (const secret of secrets) {
-    const source = formatSecretSource(secret);
-    const answer = await promptLine(
-      `  ${secret.placeholder} from ${source} [u=username, p=password, s=secret]: `,
-    );
-    const normalized = answer.trim().toLowerCase();
-    if (normalized === "u") secret.kind = "username";
-    else if (normalized === "p") secret.kind = "password";
-    else secret.kind = "secret";
+    const locator = (secret.locator ?? "").toLowerCase();
+    const action = (secret.action ?? "").toLowerCase();
+    const hint = `${locator} ${action}`;
+
+    if (
+      hint.includes("pass") ||
+      hint.includes("pwd") ||
+      hint.includes("password")
+    ) {
+      secret.kind = "password";
+      continue;
+    }
+
+    if (
+      hint.includes("user") ||
+      hint.includes("email") ||
+      hint.includes("login") ||
+      hint.includes("username")
+    ) {
+      secret.kind = "username";
+      continue;
+    }
+
+    secret.kind = "secret";
   }
 
   return secrets;
-}
-
-function formatSecretSource(secret: SecretSpec): string {
-  const action = secret.action ?? "action";
-  const locator = secret.locator ? truncate(secret.locator, 50) : "unknown";
-  return `${action} ${locator}`;
 }
 
 function summarizeStep(step: ActionStep | CaptchaStep): string {
@@ -305,17 +310,6 @@ function summarizeStep(step: ActionStep | CaptchaStep): string {
 function truncate(value: string, max: number): string {
   if (value.length <= max) return value;
   return `${value.slice(0, max - 1)}…`;
-}
-
-function promptLine(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    process.stdout.write(question);
-    const onData = (data: Buffer) => {
-      process.stdin.off("data", onData);
-      resolve(data.toString().trim());
-    };
-    process.stdin.on("data", onData);
-  });
 }
 
 async function pickStepIndex(
@@ -405,13 +399,23 @@ async function pickStepIndex(
         return;
       }
 
-      if (chunk === "j" || chunk === "n" || chunk === "\u001b[B") {
+      if (
+        chunk === "j" ||
+        chunk === "n" ||
+        chunk === "\u001b[B" ||
+        chunk === "\u000e"
+      ) {
         if (index < steps.length - 1) index += 1;
         render();
         return;
       }
 
-      if (chunk === "k" || chunk === "p" || chunk === "\u001b[A") {
+      if (
+        chunk === "k" ||
+        chunk === "p" ||
+        chunk === "\u001b[A" ||
+        chunk === "\u0010"
+      ) {
         if (index > 0) index -= 1;
         render();
         return;
