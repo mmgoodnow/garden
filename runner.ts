@@ -121,13 +121,17 @@ async function runScript(
   script: RecordedScript,
   secrets: SecretValues,
   runId: number,
+  captchaError?: string,
 ) {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
 
   try {
     for (const step of script.steps) {
-      await runStep(page, step, secrets);
+      await runStep(page, step, secrets, captchaError);
+      if (step.type === "captcha") {
+        captchaError = undefined;
+      }
     }
 
     await captureScreenshot(runId, page);
@@ -146,13 +150,17 @@ async function runScriptWithRetries(
   const attempts = Number.isFinite(retries) && retries > 0 ? retries + 1 : 1;
 
   let lastError: unknown = null;
+  let lastCaptchaError: string | undefined;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     console.log(`[runner] run ${runId} attempt ${attempt}/${attempts}`);
     try {
-      await runScript(script, secrets, runId);
+      await runScript(script, secrets, runId, lastCaptchaError);
       return;
     } catch (error) {
       lastError = error;
+      if (error instanceof CaptchaSolveError) {
+        lastCaptchaError = error.message;
+      }
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[runner] run ${runId} attempt ${attempt} failed: ${message}`);
       if (attempt < attempts) {
@@ -164,9 +172,14 @@ async function runScriptWithRetries(
   throw lastError;
 }
 
-async function runStep(page: Page, step: Step, secrets: SecretValues) {
+async function runStep(
+  page: Page,
+  step: Step,
+  secrets: SecretValues,
+  captchaError?: string,
+) {
   if (step.type === "captcha") {
-    await solveCaptcha(page, step, secrets);
+    await solveCaptcha(page, step, secrets, captchaError);
     return;
   }
 
@@ -223,6 +236,15 @@ type CaptchaModelStep = {
   value?: string;
   args?: string;
 };
+
+class CaptchaSolveError extends Error {
+  constructor(message: string, cause?: unknown) {
+    super(message);
+    if (cause) {
+      (this as { cause?: unknown }).cause = cause;
+    }
+  }
+}
 
 function resolveValue(value: string | undefined, secrets: SecretValues) {
   if (!value) return value;
@@ -313,11 +335,8 @@ async function solveCaptcha(
   page: Page,
   step: Step & { type: "captcha" },
   secrets: SecretValues,
+  previousError?: string,
 ) {
-  const maxAttempts = Number.parseInt(
-    process.env.CAPTCHA_MAX_ATTEMPTS ?? "2",
-    10,
-  );
   const target =
     step.steps.find((child) => child.type === "click" && child.locator) ??
     step.steps.find((child) => child.locator);
@@ -345,36 +364,36 @@ async function solveCaptcha(
     resolvedImages,
   );
 
-  let lastError: unknown = null;
-  const attempts = Number.isFinite(maxAttempts) && maxAttempts > 0 ? maxAttempts : 1;
-
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    const modelSteps = await requestCaptchaSteps(
+  let modelSteps: CaptchaModelStep[];
+  try {
+    modelSteps = await requestCaptchaSteps(
       page.url(),
       htmlWithMarkers,
       imageInputs,
       imageMap,
-      lastError,
+      previousError,
     );
+  } catch (error) {
+    throw new CaptchaSolveError(
+      error instanceof Error ? error.message : String(error),
+      error,
+    );
+  }
 
-    if (!modelSteps.length) {
-      throw new Error("Captcha solver returned no steps.");
-    }
+  if (!modelSteps.length) {
+    throw new CaptchaSolveError("Captcha solver returned no steps.");
+  }
 
-    try {
-      for (const modelStep of modelSteps) {
-        const normalized = normalizeCaptchaStep(modelStep);
-        await runStep(page, normalized, secrets);
-      }
-      return;
-    } catch (error) {
-      lastError = error;
-      const message = error instanceof Error ? error.message : String(error);
-      console.error(`[runner] captcha attempt ${attempt} failed: ${message}`);
-      if (attempt === attempts) {
-        throw error;
-      }
+  try {
+    for (const modelStep of modelSteps) {
+      const normalized = normalizeCaptchaStep(modelStep);
+      await runStep(page, normalized, secrets);
     }
+  } catch (error) {
+    throw new CaptchaSolveError(
+      error instanceof Error ? error.message : String(error),
+      error,
+    );
   }
 }
 
