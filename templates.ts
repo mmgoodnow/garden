@@ -286,6 +286,15 @@ export function layout(title: string, body: string) {
         border: 1px solid var(--border);
         box-shadow: var(--shadow);
       }
+      .run-preview {
+        margin-top: 12px;
+      }
+      .run-preview img {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+      }
       @media (max-width: 720px) {
         header { padding: 16px 18px; }
         main { padding: 20px 18px 44px; }
@@ -378,6 +387,8 @@ export function renderSiteDetail(
   const domain = site.domain.trim();
   const hasScheme = /^https?:\/\//i.test(domain);
   const siteUrl = hasScheme ? domain : `https://${domain}`;
+  const lastRun = runs[0];
+  const lastRunShot = lastRun ? screenshotsByRun[lastRun.id] : undefined;
   const runRows = runs
     .map((run) => {
       const shot = screenshotsByRun[run.id];
@@ -439,6 +450,11 @@ export function renderSiteDetail(
         <p>${escapeHtml(site.last_success_at ?? "-")}</p>
         <p class="muted">Last error</p>
         <pre class="error-cell">${escapeHtml(site.last_error ?? "-")}</pre>
+        ${
+          lastRunShot
+            ? `<div class="run-preview"><a href="/screenshots/${lastRunShot.id}"><img src="/screenshots/${lastRunShot.id}" alt="Last run screenshot" /></a></div>`
+            : ""
+        }
       </section>
 
       <section class="site-script">
