@@ -736,7 +736,8 @@ function renderBuildInfo() {
   if (!BUILD_INFO) return "";
   const shortSha = BUILD_INFO.sha ? BUILD_INFO.sha.slice(0, 7) : "unknown";
   const message = BUILD_INFO.message ? ` - ${escapeHtml(BUILD_INFO.message)}` : "";
-  return `<div class="build-info">Commit: ${escapeHtml(shortSha)}${message}</div>`;
+  const uptime = formatUptime(process.uptime());
+  return `<div class="build-info">Commit: ${escapeHtml(shortSha)}${message} · Uptime: ${escapeHtml(uptime)}</div>`;
 }
 
 function renderStatus(status: string) {
@@ -801,6 +802,16 @@ function formatTimestamp(value: string | null | undefined) {
   }
   const years = Math.round(absMs / (365 * 24 * 60 * 60 * 1000));
   return rtf.format(direction * years, "year");
+}
+
+function formatUptime(seconds: number) {
+  const total = Math.max(0, Math.floor(seconds));
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${Math.max(1, minutes)}m`;
 }
 
 function formatRunEvent(payload: string) {
