@@ -462,7 +462,7 @@ export function renderSiteDetail(
         <div class="section-header">
           <h3>Script</h3>
           <div class="muted inline-actions">
-            <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">Copy CLI command</button>
+            <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">Copy CLI</button>
             <button type="button" class="secondary" id="open-iterm">Open in iTerm</button>
             <button type="submit">Save Script</button>
             <span id="cli-status" class="muted"></span>
