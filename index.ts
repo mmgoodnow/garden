@@ -217,7 +217,15 @@ Bun.serve({
           .orderBy("created_at", "desc")
           .limit(1)
           .executeTakeFirst();
-        return htmlResponse(renderRunDetail(run, screenshot ?? null));
+        const captchaTraces = await db
+          .selectFrom("captcha_traces")
+          .selectAll()
+          .where("run_id", "=", runId)
+          .orderBy("created_at", "asc")
+          .execute();
+        return htmlResponse(
+          renderRunDetail(run, screenshot ?? null, captchaTraces),
+        );
       },
     },
     "/screenshots/:id": {

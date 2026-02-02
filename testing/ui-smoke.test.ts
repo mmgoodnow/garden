@@ -29,10 +29,10 @@ test(
       await page.locator('input[name="username"]').fill(MOCK_USERNAME);
       await page.locator('input[name="password"]').fill(MOCK_PASSWORD);
       await page.getByRole("button", { name: "Update" }).click();
-      await page.waitForSelector("text=Stored: yes");
+      await page.waitForSelector("text=Credentials saved");
 
       await page.locator('textarea[name="script"]').fill(scriptText);
-      await page.getByRole("button", { name: "Save Script" }).click();
+      await page.getByRole("button", { name: "Save" }).click();
       await page.waitForTimeout(500);
 
       await page.getByRole("button", { name: "Run Now" }).click();
@@ -52,7 +52,7 @@ async function waitForRunSuccess(page: Page, timeoutMs: number) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     await page.reload();
-    const successCell = page.getByRole("cell", { name: "success" });
+    const successCell = page.getByRole("cell", { name: /success/i });
     if (await successCell.count()) {
       return;
     }

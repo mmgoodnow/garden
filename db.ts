@@ -44,11 +44,24 @@ export type ScreenshotsTable = {
   created_at: string;
 };
 
+export type CaptchaTracesTable = {
+  id: Generated<number>;
+  run_id: number;
+  attempt: number;
+  sequence: number;
+  model: string;
+  prompt: string;
+  response: string | null;
+  error: string | null;
+  created_at: string;
+};
+
 export type DB = {
   sites: SitesTable;
   scripts: ScriptsTable;
   runs: RunsTable;
   screenshots: ScreenshotsTable;
+  captcha_traces: CaptchaTracesTable;
 };
 
 export const sqlite = createSqlite();
@@ -109,6 +122,20 @@ export async function initDb() {
     .addColumn("run_id", "integer", (col) => col.notNull())
     .addColumn("data", "blob", (col) => col.notNull())
     .addColumn("mime_type", "text", (col) => col.notNull())
+    .addColumn("created_at", "text", (col) => col.notNull())
+    .execute();
+
+  await db.schema
+    .createTable("captcha_traces")
+    .ifNotExists()
+    .addColumn("id", "integer", (col) => col.primaryKey().autoIncrement())
+    .addColumn("run_id", "integer", (col) => col.notNull())
+    .addColumn("attempt", "integer", (col) => col.notNull())
+    .addColumn("sequence", "integer", (col) => col.notNull())
+    .addColumn("model", "text", (col) => col.notNull())
+    .addColumn("prompt", "text", (col) => col.notNull())
+    .addColumn("response", "text")
+    .addColumn("error", "text")
     .addColumn("created_at", "text", (col) => col.notNull())
     .execute();
 }

@@ -36,6 +36,18 @@ type RunScreenshotRow = {
   created_at: string;
 } | null;
 
+type CaptchaTraceRow = {
+  id: number;
+  run_id: number;
+  attempt: number;
+  sequence: number;
+  model: string;
+  prompt: string;
+  response: string | null;
+  error: string | null;
+  created_at: string;
+};
+
 export function layout(title: string, body: string) {
   return `<!doctype html>
 <html lang="en">
@@ -294,6 +306,20 @@ export function layout(title: string, body: string) {
         max-width: 100%;
         border-radius: 10px;
         border: 1px solid var(--border);
+      }
+      details.captcha-trace {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        margin-top: 10px;
+        background: var(--panel-2);
+      }
+      details.captcha-trace summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+      details.captcha-trace pre {
+        max-height: 240px;
       }
       @media (max-width: 720px) {
         header { padding: 16px 18px; }
@@ -567,12 +593,36 @@ export function renderSiteDetail(
   );
 }
 
-export function renderRunDetail(run: RunRow, screenshot: RunScreenshotRow) {
+export function renderRunDetail(
+  run: RunRow,
+  screenshot: RunScreenshotRow,
+  traces: CaptchaTraceRow[],
+) {
   const screenshotHtml = screenshot
     ? `<div class="run-screenshot">
         <img src="/screenshots/${screenshot.id}" alt="Run screenshot" />
       </div>`
     : `<p class="muted">No screenshot captured for this run.</p>`;
+
+  const traceItems = traces
+    .map((trace) => {
+      const status = trace.error ? "❌" : "✅";
+      const responseText = trace.response ?? "-";
+      const errorText = trace.error ?? "-";
+      return `<details class="captcha-trace">
+        <summary>${status} Attempt ${trace.attempt} · Step ${trace.sequence} · ${escapeHtml(trace.model)}</summary>
+        <p class="muted">Prompt</p>
+        <pre>${escapeHtml(trace.prompt)}</pre>
+        <p class="muted">Response</p>
+        <pre>${escapeHtml(responseText)}</pre>
+        ${
+          trace.error
+            ? `<p class="muted">Error</p><pre>${escapeHtml(errorText)}</pre>`
+            : ""
+        }
+      </details>`;
+    })
+    .join("");
 
   return layout(
     `Run #${run.id}`,
@@ -583,6 +633,13 @@ export function renderRunDetail(run: RunRow, screenshot: RunScreenshotRow) {
       <p>Finished: ${formatTimestamp(run.finished_at)}</p>
       <p>Error: ${escapeHtml(run.error ?? "-")}</p>
       ${screenshotHtml}
+    </section>
+    <section>
+      <h3>Captcha trace</h3>
+      ${
+        traceItems ||
+        `<p class="muted">No captcha trace recorded for this run.</p>`
+      }
     </section>`,
   );
 }

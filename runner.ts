@@ -121,14 +121,19 @@ async function runScript(
   script: RecordedScript,
   secrets: SecretValues,
   runId: number,
+  attempt: number,
   captchaError?: string,
 ) {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
+  let captchaSequence = 0;
 
   try {
     for (const step of script.steps) {
-      await runStep(page, step, secrets, captchaError);
+      if (step.type === "captcha") {
+        captchaSequence += 1;
+      }
+      await runStep(page, step, secrets, runId, attempt, captchaSequence, captchaError);
       if (step.type === "captcha") {
         captchaError = undefined;
       }
@@ -154,7 +159,7 @@ async function runScriptWithRetries(
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     console.log(`[runner] run ${runId} attempt ${attempt}/${attempts}`);
     try {
-      await runScript(script, secrets, runId, lastCaptchaError);
+      await runScript(script, secrets, runId, attempt, lastCaptchaError);
       return;
     } catch (error) {
       lastError = error;
@@ -176,10 +181,13 @@ async function runStep(
   page: Page,
   step: Step,
   secrets: SecretValues,
+  runId: number,
+  attempt: number,
+  captchaSequence: number,
   captchaError?: string,
 ) {
   if (step.type === "captcha") {
-    await solveCaptcha(page, step, secrets, captchaError);
+    await solveCaptcha(page, step, secrets, runId, attempt, captchaSequence, captchaError);
     return;
   }
 
@@ -335,6 +343,9 @@ async function solveCaptcha(
   page: Page,
   step: Step & { type: "captcha" },
   secrets: SecretValues,
+  runId: number,
+  attempt: number,
+  sequence: number,
   previousError?: string,
 ) {
   const target =
@@ -365,15 +376,36 @@ async function solveCaptcha(
   );
 
   let modelSteps: CaptchaModelStep[];
+  const request = buildCaptchaRequest(
+    page.url(),
+    htmlWithMarkers,
+    imageInputs,
+    imageMap,
+    previousError,
+    secrets,
+  );
   try {
-    modelSteps = await requestCaptchaSteps(
-      page.url(),
-      htmlWithMarkers,
-      imageInputs,
-      imageMap,
-      previousError,
-    );
+    const response = await requestCaptchaSteps(request);
+    modelSteps = response.steps;
+    await recordCaptchaTrace({
+      run_id: runId,
+      attempt,
+      sequence,
+      model: request.model,
+      prompt: request.prompt,
+      response: response.responseText,
+      error: null,
+    });
   } catch (error) {
+    await recordCaptchaTrace({
+      run_id: runId,
+      attempt,
+      sequence,
+      model: request.model,
+      prompt: request.prompt,
+      response: null,
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw new CaptchaSolveError(
       error instanceof Error ? error.message : String(error),
       error,
@@ -465,31 +497,17 @@ function sanitizeCaptchaHtml(html: string, secrets: SecretValues): string {
   );
   sanitized = sanitized.replace(/\svalue=(['"]).*?\1/gi, "");
   sanitized = sanitized.replace(/\sdata-value=(['"]).*?\1/gi, "");
-  const secretValues = Array.from(
-    new Set(
-      Object.values(secrets).filter(
-        (value): value is string => typeof value === "string" && value.length > 0,
-      ),
-    ),
-  );
-  for (const value of secretValues) {
-    sanitized = sanitized.split(value).join("[REDACTED]");
-  }
-  return sanitized;
+  return redactSecretsInText(sanitized, secrets);
 }
 
-async function requestCaptchaSteps(
+function buildCaptchaRequest(
   pageUrl: string,
   html: string,
   imageInputs: Array<{ type: "input_image"; image_url: string }>,
   imageMap: string,
-  previousError?: unknown,
-): Promise<CaptchaModelStep[]> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY is required to solve captcha steps.");
-  }
-
+  previousError: unknown,
+  secrets: SecretValues,
+) {
   const model = process.env.OPENAI_MODEL ?? "gpt-5-mini";
   const instructions = [
     "You are helping automate captcha completion inside a web page.",
@@ -501,12 +519,15 @@ async function requestCaptchaSteps(
     "Only include the actions required to solve the captcha and proceed.",
   ].join(" ");
 
-  const errorText =
+  const errorTextRaw =
     previousError instanceof Error
       ? previousError.message
       : previousError
         ? String(previousError)
         : "";
+  const errorText = errorTextRaw
+    ? redactSecretsInText(errorTextRaw, secrets)
+    : "";
 
   const userText = [
     `Page URL: ${pageUrl}`,
@@ -565,13 +586,30 @@ async function requestCaptchaSteps(
     },
   };
 
+  return {
+    model,
+    prompt: truncateText([instructions, "", userText].join("\n")),
+    payload,
+  };
+}
+
+async function requestCaptchaSteps(request: {
+  model: string;
+  prompt: string;
+  payload: unknown;
+}): Promise<{ steps: CaptchaModelStep[]; responseText: string }> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is required to solve captcha steps.");
+  }
+
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(request.payload),
   });
 
   if (!response.ok) {
@@ -590,7 +628,7 @@ async function requestCaptchaSteps(
     throw new Error("OpenAI captcha response did not include steps.");
   }
 
-  return parsed.steps as CaptchaModelStep[];
+  return { steps: parsed.steps as CaptchaModelStep[], responseText: outputText };
 }
 
 function extractOutputText(payload: unknown): string {
@@ -655,6 +693,59 @@ function scopeCaptchaSelector(locator: string): string {
     return trimmed;
   }
   return `#captcha ${trimmed}`;
+}
+
+function redactSecretsInText(text: string, secrets: SecretValues) {
+  let sanitized = text;
+  const secretValues = Array.from(
+    new Set(
+      Object.values(secrets).filter(
+        (value): value is string => typeof value === "string" && value.length > 0,
+      ),
+    ),
+  );
+  for (const value of secretValues) {
+    sanitized = sanitized.split(value).join("[REDACTED]");
+  }
+  return sanitized;
+}
+
+function truncateText(text: string, maxLength = 8000) {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength)}…`;
+}
+
+async function recordCaptchaTrace(entry: {
+  run_id: number;
+  attempt: number;
+  sequence: number;
+  model: string;
+  prompt: string;
+  response: string | null;
+  error: string | null;
+}) {
+  if (!entry.run_id) return;
+  try {
+    await db
+      .insertInto("captcha_traces")
+      .values({
+        run_id: entry.run_id,
+        attempt: entry.attempt,
+        sequence: entry.sequence,
+        model: entry.model,
+        prompt: entry.prompt,
+        response: entry.response,
+        error: entry.error,
+        created_at: new Date().toISOString(),
+      })
+      .execute();
+  } catch (err) {
+    console.warn(
+      `[runner] failed to store captcha trace for run ${entry.run_id}: ${
+        err instanceof Error ? err.message : String(err)
+      }`,
+    );
+  }
 }
 
 async function captureScreenshot(runId: number, page: Page) {
