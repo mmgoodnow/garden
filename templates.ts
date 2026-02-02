@@ -232,6 +232,17 @@ export function layout(title: string, body: string) {
       .inline-actions button {
         width: auto;
       }
+      .section-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 8px;
+      }
+      .section-header h3 {
+        margin: 0;
+      }
       @media (max-width: 720px) {
         header { padding: 16px 18px; }
         main { padding: 20px 18px 44px; }
@@ -375,11 +386,13 @@ export function renderSiteDetail(
       </div>
 
       <section class="site-script">
-      <h3>Script</h3>
-      <div class="muted inline-actions" style="margin-bottom: 8px;">
-        <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">Copy CLI command</button>
-        <button type="button" class="secondary" id="open-iterm">Open in iTerm</button>
-        <span id="cli-status" class="muted" style="margin-left: 8px;"></span>
+      <div class="section-header">
+        <h3>Script</h3>
+        <div class="muted inline-actions">
+          <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">Copy CLI command</button>
+          <button type="button" class="secondary" id="open-iterm">Open in iTerm</button>
+          <span id="cli-status" class="muted"></span>
+        </div>
       </div>
       <form method="post" action="/sites/${site.id}/script">
         <label>Recorded JSON</label>
