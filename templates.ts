@@ -27,6 +27,7 @@ type ScriptRow = {
 
 type ScreenshotRow = {
   id: number;
+  run_id: number;
   created_at: string;
 };
 
@@ -132,7 +133,6 @@ export function layout(title: string, body: string) {
       .muted { color: var(--muted); }
       .error-cell {
         width: 100%;
-        max-width: none;
         display: block;
         white-space: nowrap;
         overflow-x: auto;
@@ -141,6 +141,29 @@ export function layout(title: string, body: string) {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
         gap: 16px;
+      }
+      .site-top {
+        display: flex;
+        gap: 16px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+      .site-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        flex: 0 1 320px;
+        max-width: 360px;
+      }
+      .site-script {
+        flex: 1 1 520px;
+        min-width: 320px;
+      }
+      .runs-table {
+        table-layout: fixed;
+      }
+      .runs-table th, .runs-table td {
+        vertical-align: top;
       }
       label { display: block; font-size: 12px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
       input, textarea, button, select {
@@ -282,7 +305,7 @@ export function renderSiteDetail(
   },
   script: ScriptRow | null,
   runs: RunRow[],
-  screenshots: ScreenshotRow[],
+  screenshotsByRun: Record<number, ScreenshotRow | undefined>,
 ) {
   const scriptId = script?.id ?? 0;
   const scriptContent = script ? escapeHtml(script.content) : "";
@@ -290,59 +313,56 @@ export function renderSiteDetail(
   const hasScheme = /^https?:\/\//i.test(domain);
   const siteUrl = hasScheme ? domain : `https://${domain}`;
   const runRows = runs
-    .map(
-      (run) => `<tr>
+    .map((run) => {
+      const shot = screenshotsByRun[run.id];
+      const shotCell = shot
+        ? `<a href="/screenshots/${shot.id}" title="${escapeHtml(shot.created_at)}">view</a>`
+        : "-";
+      return `<tr>
         <td><a href="/runs/${run.id}">#${run.id}</a></td>
         <td>${escapeHtml(run.status)}</td>
         <td>${escapeHtml(run.started_at)}</td>
         <td>${escapeHtml(run.finished_at ?? "-")}</td>
-        <td class="error-cell">${escapeHtml(run.error ?? "-")}</td>
-      </tr>`,
-    )
-    .join("");
-
-  const screenshotRows = screenshots
-    .map(
-      (shot) => `<tr>
-        <td><a href="/screenshots/${shot.id}">view</a></td>
-        <td>${escapeHtml(shot.created_at)}</td>
-      </tr>`,
-    )
+        <td>${shotCell}</td>
+        <td><div class="error-cell">${escapeHtml(run.error ?? "-")}</div></td>
+      </tr>`;
+    })
     .join("");
 
   return layout(
     site.name,
-    `<div class="row">
-      <section>
-        <h2>${escapeHtml(site.name)}</h2>
-        <p class="muted">${escapeHtml(site.domain)}</p>
-        <div class="actions">
-          <form method="post" action="/sites/${site.id}/run">
-            <button type="submit">Run Now</button>
+    `<div class="site-top">
+      <div class="site-stack">
+        <section>
+          <h2>${escapeHtml(site.name)}</h2>
+          <p class="muted">${escapeHtml(site.domain)}</p>
+          <div class="actions">
+            <form method="post" action="/sites/${site.id}/run">
+              <button type="submit">Run Now</button>
+            </form>
+            <form method="post" action="/sites/${site.id}/delete" onsubmit="return confirm('Delete this site and all related data?');">
+              <button type="submit" class="secondary">Delete Site</button>
+            </form>
+          </div>
+        </section>
+        <section>
+          <h3>Credentials</h3>
+          <form method="post" action="/sites/${site.id}/credentials">
+            <label>Username</label>
+            <input name="username" placeholder="user@example.com" />
+            <label>Password</label>
+            <input name="password" type="password" />
+            <button type="submit">Update</button>
           </form>
-          <form method="post" action="/sites/${site.id}/delete" onsubmit="return confirm('Delete this site and all related data?');">
-            <button type="submit" class="secondary">Delete Site</button>
-          </form>
-        </div>
-      </section>
-      <section>
-        <h3>Credentials</h3>
-        <form method="post" action="/sites/${site.id}/credentials">
-          <label>Username</label>
-          <input name="username" placeholder="user@example.com" />
-          <label>Password</label>
-          <input name="password" type="password" />
-          <button type="submit">Update</button>
-        </form>
-        <p class="muted">
-          Stored: ${
-            site.username_enc && site.password_enc ? "yes" : "no"
-          }
-        </p>
-      </section>
-    </div>
+          <p class="muted">
+            Stored: ${
+              site.username_enc && site.password_enc ? "yes" : "no"
+            }
+          </p>
+        </section>
+      </div>
 
-    <section>
+      <section class="site-script">
       <h3>Script</h3>
       <div class="muted" style="margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
         <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">
@@ -358,44 +378,35 @@ export function renderSiteDetail(
         <textarea name="script" rows="12" data-script-id="${scriptId}">${scriptContent}</textarea>
         <button type="submit">Save Script</button>
       </form>
-    </section>
-
-    <div class="row">
-      <section>
-        <h3>Runs</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Status</th>
-              <th>Started</th>
-              <th>Finished</th>
-              <th>Error</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${runRows || `<tr><td colspan="5" class="muted">No runs yet.</td></tr>`}
-          </tbody>
-        </table>
-      </section>
-      <section>
-        <h3>Screenshots</h3>
-        <table>
-          <thead>
-            <tr>
-              <th>Preview</th>
-              <th>Created</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${
-              screenshotRows ||
-              `<tr><td colspan="2" class="muted">No screenshots yet.</td></tr>`
-            }
-          </tbody>
-        </table>
       </section>
     </div>
+
+    <section>
+      <h3>Runs</h3>
+      <table class="runs-table">
+        <colgroup>
+          <col style="width: 64px;" />
+          <col style="width: 90px;" />
+          <col style="width: 190px;" />
+          <col style="width: 190px;" />
+          <col style="width: 90px;" />
+          <col />
+        </colgroup>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Status</th>
+            <th>Started</th>
+            <th>Finished</th>
+            <th>Shot</th>
+            <th>Error</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${runRows || `<tr><td colspan="6" class="muted">No runs yet.</td></tr>`}
+        </tbody>
+      </table>
+    </section>
 
     <script>
       (() => {

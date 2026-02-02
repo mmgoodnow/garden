@@ -89,19 +89,27 @@ Bun.serve({
           .limit(10)
           .execute();
 
-        const screenshots = await db
-          .selectFrom("screenshots")
-          .innerJoin("runs", "runs.id", "screenshots.run_id")
-          .select([
-            "screenshots.id as id",
-            "screenshots.created_at as created_at",
-          ])
-          .where("runs.site_id", "=", siteId)
-          .orderBy("screenshots.created_at", "desc")
-          .limit(10)
-          .execute();
+        const runIds = runs.map((run) => run.id);
+        const screenshotsByRun: Record<number, { id: number; run_id: number; created_at: string }> = {};
 
-        return htmlResponse(renderSiteDetail(site, script ?? null, runs, screenshots));
+        if (runIds.length > 0) {
+          const screenshots = await db
+            .selectFrom("screenshots")
+            .select(["id", "run_id", "created_at"])
+            .where("run_id", "in", runIds)
+            .orderBy("created_at", "desc")
+            .execute();
+
+          for (const shot of screenshots) {
+            if (!screenshotsByRun[shot.run_id]) {
+              screenshotsByRun[shot.run_id] = shot;
+            }
+          }
+        }
+
+        return htmlResponse(
+          renderSiteDetail(site, script ?? null, runs, screenshotsByRun),
+        );
       },
     },
     "/sites/:id/credentials": {
