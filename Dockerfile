@@ -10,7 +10,7 @@ ENV PATH=/root/.bun/bin:$PATH
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends curl ca-certificates unzip \
+  && apt-get install -y --no-install-recommends curl ca-certificates unzip git \
   && curl -fsSL https://bun.sh/install | bash \
   && rm -rf /var/lib/apt/lists/*
 
@@ -19,28 +19,7 @@ RUN bun install --production
 
 COPY . .
 
-RUN bun -e "import { existsSync, readFileSync, writeFileSync } from 'node:fs';\
-const shaArg = process.env.GIT_COMMIT_SHA ?? '';\
-const msgArg = process.env.GIT_COMMIT_MESSAGE ?? '';\
-let sha = shaArg; let message = msgArg;\
-try {\
-  if (!sha && existsSync('.git/HEAD')) {\
-    const head = readFileSync('.git/HEAD', 'utf8').trim();\
-    if (head.startsWith('ref:')) {\
-      const ref = head.replace('ref:', '').trim();\
-      const refPath = '.git/' + ref;\
-      if (existsSync(refPath)) sha = readFileSync(refPath, 'utf8').trim();\
-    } else {\
-      sha = head;\
-    }\
-  }\
-  if (!message && existsSync('.git/logs/HEAD')) {\
-    const log = readFileSync('.git/logs/HEAD', 'utf8').trim().split('\\n').pop() ?? '';\
-    const parts = log.split('\\t');\
-    message = parts[1] ? parts[1].trim() : '';\
-  }\
-} catch {}\
-writeFileSync('build-info.json', JSON.stringify({ sha, message }));" && rm -rf .git
+RUN bun scripts/build-info.ts /app/build-info.json && rm -rf .git
 
 ENV PORT=80
 ENV DATA_DIR=/config

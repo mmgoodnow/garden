@@ -50,10 +50,7 @@ function readGitFromFiles() {
     let sha = "";
     if (head.startsWith("ref:")) {
       const ref = head.replace("ref:", "").trim();
-      const refPath = join(process.cwd(), ".git", ref);
-      if (existsSync(refPath)) {
-        sha = readFileSync(refPath, "utf8").trim();
-      }
+      sha = readPackedRef(ref) ?? "";
     } else {
       sha = head;
     }
@@ -70,6 +67,24 @@ function readGitFromFiles() {
   } catch {
     return { sha: null, message: null };
   }
+}
+
+function readPackedRef(ref: string) {
+  const refPath = join(process.cwd(), ".git", ref);
+  if (existsSync(refPath)) {
+    return readFileSync(refPath, "utf8").trim();
+  }
+
+  const packedPath = join(process.cwd(), ".git", "packed-refs");
+  if (!existsSync(packedPath)) return null;
+
+  const lines = readFileSync(packedPath, "utf8").split("\n");
+  for (const line of lines) {
+    if (!line || line.startsWith("#") || line.startsWith("^")) continue;
+    const [hash, name] = line.split(" ");
+    if (name === ref) return hash;
+  }
+  return null;
 }
 
 function readBuildInfoFile() {
