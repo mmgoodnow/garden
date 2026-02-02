@@ -10,6 +10,28 @@ type SecretValues = {
   [key: string]: string | undefined;
 };
 
+function buildBaseUrl(domain: string | null) {
+  if (!domain) return null;
+  const trimmed = domain.trim();
+  if (!trimmed) return null;
+  const hasScheme = /^https?:\/\//i.test(trimmed);
+  const base = hasScheme ? trimmed : `${defaultScheme(trimmed)}${trimmed}`;
+  return base.replace(/\/$/, "");
+}
+
+function defaultScheme(domain: string) {
+  const lower = domain.toLowerCase();
+  if (
+    lower.startsWith("localhost") ||
+    lower.startsWith("127.0.0.1") ||
+    lower.startsWith("[::1]") ||
+    lower.endsWith(".local")
+  ) {
+    return "http://";
+  }
+  return "https://";
+}
+
 export async function runSite(siteId: number) {
   const site = await db
     .selectFrom("sites")
@@ -69,7 +91,8 @@ export async function runSite(siteId: number) {
 
   try {
     const secrets = buildSecrets(site.username_enc, site.password_enc, script);
-    await runScriptWithRetries(script, secrets, runId);
+    const baseUrl = buildBaseUrl(site.domain);
+    await runScriptWithRetries(script, secrets, runId, baseUrl);
 
     const duration = Date.now() - startedAt;
     await db
@@ -140,6 +163,7 @@ async function runScript(
   secrets: SecretValues,
   runId: number,
   attempt: number,
+  startUrl: string | null,
   captchaError?: string,
 ) {
   const browser = await chromium.launch({ headless: true });
@@ -147,6 +171,10 @@ async function runScript(
   let captchaSequence = 0;
 
   try {
+    if (startUrl && script.steps[0]?.type !== "goto") {
+      emitRunEvent(runId, { type: "auto.goto", url: startUrl });
+      await page.goto(startUrl, { waitUntil: "domcontentloaded" });
+    }
     for (const [index, step] of script.steps.entries()) {
       if (step.type === "captcha") {
         captchaSequence += 1;
@@ -180,6 +208,7 @@ async function runScriptWithRetries(
   script: RecordedScript,
   secrets: SecretValues,
   runId: number,
+  startUrl: string | null,
 ) {
   const retries = Number.parseInt(process.env.RUNNER_MAX_RETRIES ?? "1", 10);
   const delayMs = Number.parseInt(process.env.RUNNER_RETRY_DELAY_MS ?? "2000", 10);
@@ -196,7 +225,7 @@ async function runScriptWithRetries(
       total: attempts,
     });
     try {
-      await runScript(script, secrets, runId, attempt, lastCaptchaError);
+      await runScript(script, secrets, runId, attempt, startUrl, lastCaptchaError);
       return;
     } catch (error) {
       lastError = error;

@@ -17,6 +17,7 @@ await initDb();
 
 Bun.serve({
   port: PORT,
+  idleTimeout: 60,
   routes: {
     "/": {
       GET: async () => {
