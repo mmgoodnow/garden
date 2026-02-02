@@ -1,3 +1,4 @@
+import { BUILD_INFO } from "./config";
 import { escapeHtml } from "./util";
 
 type SiteRow = {
@@ -77,11 +78,24 @@ export function layout(title: string, body: string) {
         position: sticky;
         top: 0;
         z-index: 10;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .header-bar {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
       }
       header h1 {
         margin: 0;
         font-size: 22px;
         letter-spacing: 0.2px;
+      }
+      .build-info {
+        font-size: 12px;
+        color: var(--muted);
       }
       main {
         padding: 28px 28px 56px;
@@ -191,11 +205,14 @@ export function layout(title: string, body: string) {
   </head>
   <body>
     <header>
-      <h1>Garden</h1>
-      <nav>
-        <a href="/">Sites</a>
-        <a href="/sites/new">New Site</a>
-      </nav>
+      <div class="header-bar">
+        <h1>Garden</h1>
+        <nav>
+          <a href="/">Sites</a>
+          <a href="/sites/new">New Site</a>
+        </nav>
+      </div>
+      ${renderBuildInfo()}
     </header>
     <main>
       ${body}
@@ -327,9 +344,12 @@ export function renderSiteDetail(
 
     <section>
       <h3>Script</h3>
-      <div class="muted" style="margin-bottom: 8px;">
+      <div class="muted" style="margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
         <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">
           Copy CLI command
+        </button>
+        <button type="button" class="secondary" id="open-iterm">
+          Open in iTerm
         </button>
         <span id="cli-status" class="muted" style="margin-left: 8px;"></span>
       </div>
@@ -380,6 +400,7 @@ export function renderSiteDetail(
     <script>
       (() => {
         const copyBtn = document.getElementById("copy-cli");
+        const itermBtn = document.getElementById("open-iterm");
         const statusEl = document.getElementById("cli-status");
         const textarea = document.querySelector("textarea[name='script']");
         if (!copyBtn || !statusEl || !textarea) return;
@@ -394,6 +415,7 @@ export function renderSiteDetail(
           origin +
           " --site-id " +
           siteId;
+        const itermUrl = "iterm2:/command?c=" + encodeURIComponent(cmd);
 
         async function waitForScript() {
           const afterId = Number(textarea.dataset.scriptId || "0");
@@ -429,6 +451,14 @@ export function renderSiteDetail(
           }
           void waitForScript();
         });
+
+        if (itermBtn) {
+          itermBtn.addEventListener("click", () => {
+            statusEl.textContent = "Opening iTerm...";
+            window.location.href = itermUrl;
+            void waitForScript();
+          });
+        }
       })();
     </script>`,
   );
@@ -445,4 +475,11 @@ export function renderRunDetail(run: RunRow) {
       <p>Error: ${escapeHtml(run.error ?? "-")}</p>
     </section>`,
   );
+}
+
+function renderBuildInfo() {
+  if (!BUILD_INFO) return "";
+  const shortSha = BUILD_INFO.sha ? BUILD_INFO.sha.slice(0, 7) : "unknown";
+  const message = BUILD_INFO.message ? ` - ${escapeHtml(BUILD_INFO.message)}` : "";
+  return `<div class="build-info">Commit: ${escapeHtml(shortSha)}${message}</div>`;
 }
