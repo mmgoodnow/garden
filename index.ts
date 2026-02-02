@@ -1,5 +1,5 @@
 import { initDb, db } from "./db";
-import { PORT } from "./config";
+import { BUILD_INFO, PORT } from "./config";
 import { encryptSecret } from "./crypto";
 import { parseScript } from "./script";
 import { runSite } from "./runner";
@@ -12,6 +12,13 @@ import {
   renderSiteDetail,
   renderSiteList,
 } from "./templates";
+
+if (process.argv.includes("--version")) {
+  const sha = BUILD_INFO?.sha ? BUILD_INFO.sha.slice(0, 7) : "unknown";
+  const message = BUILD_INFO?.message ? ` - ${BUILD_INFO.message}` : "";
+  console.log(`garden ${sha}${message}`);
+  process.exit(0);
+}
 
 await initDb();
 
