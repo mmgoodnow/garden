@@ -215,6 +215,9 @@ export function layout(title: string, body: string) {
         max-height: 320px;
         overflow: auto;
       }
+      .script-textarea {
+        min-height: 360px;
+      }
       .actions {
         display: flex;
         flex-wrap: wrap;
@@ -375,7 +378,7 @@ export function renderSiteDetail(
       </div>
       <form method="post" action="/sites/${site.id}/script">
         <label>Recorded JSON</label>
-        <textarea name="script" rows="12" data-script-id="${scriptId}">${scriptContent}</textarea>
+        <textarea name="script" rows="18" class="script-textarea" data-script-id="${scriptId}">${scriptContent}</textarea>
         <button type="submit">Save Script</button>
       </form>
       </section>
