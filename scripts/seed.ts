@@ -29,7 +29,7 @@ const credentials = buildCredentials();
 const sites: SiteInput[] = [
   {
     name: "Mock Site",
-    domain: "localhost",
+    domain: "localhost:4001",
     status: "success",
     error: null,
   },
@@ -127,7 +127,6 @@ function buildSampleScript(domain: string) {
       recordedAt: new Date().toISOString(),
     },
     steps: [
-      { type: "goto", url: `${baseUrl}/login` },
       { type: "fill", locator: "page.getByLabel('Username')", value: "{{username}}" },
       { type: "fill", locator: "page.getByLabel('Password')", value: "{{password}}" },
       { type: "captcha", steps: [{ type: "click", locator: "#captcha" }] },
