@@ -132,10 +132,10 @@ export function layout(title: string, body: string) {
       tr:last-child td { border-bottom: none; }
       .muted { color: var(--muted); }
       .error-cell {
+        margin: 0;
         width: 100%;
-        display: block;
-        white-space: nowrap;
-        overflow-x: auto;
+        white-space: pre-wrap;
+        overflow: auto;
       }
       .row {
         display: grid;
@@ -347,7 +347,7 @@ export function renderSiteDetail(
         <td>${escapeHtml(run.started_at)}</td>
         <td>${escapeHtml(run.finished_at ?? "-")}</td>
         <td>${shotCell}</td>
-        <td><div class="error-cell">${escapeHtml(run.error ?? "-")}</div></td>
+        <td><pre class="error-cell">${escapeHtml(run.error ?? "-")}</pre></td>
       </tr>`;
     })
     .join("");
@@ -408,9 +408,9 @@ export function renderSiteDetail(
         <colgroup>
           <col style="width: 64px;" />
           <col style="width: 90px;" />
-          <col style="width: 190px;" />
-          <col style="width: 190px;" />
-          <col style="width: 90px;" />
+          <col style="width: 160px;" />
+          <col style="width: 160px;" />
+          <col style="width: 70px;" />
           <col />
         </colgroup>
         <thead>
