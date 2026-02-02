@@ -603,17 +603,44 @@ function renderStatus(status: string) {
   return escapeHtml(status);
 }
 
-const timestampFormatter = new Intl.DateTimeFormat("en-US", {
-  year: "numeric",
-  month: "short",
-  day: "2-digit",
-  hour: "numeric",
-  minute: "2-digit",
-});
-
 function formatTimestamp(value: string | null | undefined) {
   if (!value || value === "-") return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return escapeHtml(value);
-  return timestampFormatter.format(date);
+  const diffMs = date.getTime() - Date.now();
+  const absMs = Math.abs(diffMs);
+  const direction = diffMs < 0 ? -1 : 1;
+  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+
+  if (absMs < 45 * 1000) {
+    return diffMs < 0 ? "just now" : "in a moment";
+  }
+  if (absMs < 90 * 1000) {
+    return rtf.format(direction * 1, "minute");
+  }
+  if (absMs < 45 * 60 * 1000) {
+    const minutes = Math.round(absMs / (60 * 1000));
+    return rtf.format(direction * minutes, "minute");
+  }
+  if (absMs < 22 * 60 * 60 * 1000) {
+    const hours = Math.round(absMs / (60 * 60 * 1000));
+    return rtf.format(direction * hours, "hour");
+  }
+  if (absMs < 36 * 60 * 60 * 1000) {
+    return rtf.format(direction * 1, "day");
+  }
+  if (absMs < 26 * 24 * 60 * 60 * 1000) {
+    const days = Math.round(absMs / (24 * 60 * 60 * 1000));
+    return rtf.format(direction * days, "day");
+  }
+  if (absMs < 45 * 24 * 60 * 60 * 1000) {
+    const weeks = Math.round(absMs / (7 * 24 * 60 * 60 * 1000));
+    return rtf.format(direction * weeks, "week");
+  }
+  if (absMs < 320 * 24 * 60 * 60 * 1000) {
+    const months = Math.round(absMs / (30 * 24 * 60 * 60 * 1000));
+    return rtf.format(direction * months, "month");
+  }
+  const years = Math.round(absMs / (365 * 24 * 60 * 60 * 1000));
+  return rtf.format(direction * years, "year");
 }
