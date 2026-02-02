@@ -8,12 +8,15 @@ export const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 export const BUILD_INFO = getBuildInfo();
 
 function getBuildInfo() {
+  const fileInfo = readBuildInfoFile();
   const sha =
     process.env.GIT_COMMIT_SHA ??
+    fileInfo.sha ??
     readGitFromFiles().sha ??
     readGit("rev-parse", "HEAD");
   const message =
     process.env.GIT_COMMIT_MESSAGE ??
+    fileInfo.message ??
     readGitFromFiles().message ??
     readGit("log", "-1", "--pretty=%s");
 
@@ -64,6 +67,19 @@ function readGitFromFiles() {
     }
 
     return { sha: sha || null, message: message || null };
+  } catch {
+    return { sha: null, message: null };
+  }
+}
+
+function readBuildInfoFile() {
+  try {
+    const path =
+      process.env.BUILD_INFO_PATH ?? join(process.cwd(), "build-info.json");
+    if (!existsSync(path)) return { sha: null, message: null };
+    const raw = readFileSync(path, "utf8");
+    const data = JSON.parse(raw) as { sha?: string; message?: string };
+    return { sha: data.sha ?? null, message: data.message ?? null };
   } catch {
     return { sha: null, message: null };
   }
