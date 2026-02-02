@@ -116,7 +116,13 @@ export function parseCodegen(text: string): RecordedScript {
 }
 
 async function annotateCaptcha(steps: ActionStep[]): Promise<Step[]> {
-  if (!process.stdin.isTTY) {
+  if (
+    !process.stdin.isTTY ||
+    process.env.GARDEN_NO_PROMPT === "1" ||
+    process.env.BUN_TEST === "1" ||
+    process.env.NODE_ENV === "test" ||
+    process.env.CI === "1"
+  ) {
     return steps;
   }
 
