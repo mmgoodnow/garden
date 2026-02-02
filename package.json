@@ -20,6 +20,6 @@
   "dependencies": {
     "@meck93/kysely-bun-sqlite": "^0.2.0",
     "kysely": "^0.28.11",
-    "playwright": "^1.58.1"
+    "playwright": "1.41.2"
   }
 }

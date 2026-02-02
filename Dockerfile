@@ -1,18 +1,21 @@
-FROM oven/bun:1.3.2
+FROM mcr.microsoft.com/playwright:v1.41.2-jammy
 
 ARG GIT_COMMIT_SHA=""
 ARG GIT_COMMIT_MESSAGE=""
 
 ENV DEBIAN_FRONTEND=noninteractive
+ENV BUN_INSTALL=/root/.bun
+ENV PATH=/root/.bun/bin:$PATH
 
 WORKDIR /app
 
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl ca-certificates \
+  && curl -fsSL https://bun.sh/install | bash \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json bun.lock ./
 RUN bun install --production
-
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-RUN mkdir -p /ms-playwright
-RUN bunx playwright install --with-deps chromium chromium-headless-shell
 
 COPY . .
 
