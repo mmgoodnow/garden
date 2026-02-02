@@ -171,7 +171,7 @@ export function layout(title: string, body: string) {
         vertical-align: top;
       }
       label { display: block; font-size: 12px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
-      input, textarea, button, select {
+      input, textarea, select {
         width: 100%;
         padding: 8px 10px;
         font-size: 14px;
@@ -192,6 +192,8 @@ export function layout(title: string, body: string) {
         cursor: pointer;
         padding: 10px 12px;
         font-weight: 600;
+        width: auto;
+        align-self: flex-start;
         transition: transform 120ms ease, box-shadow 120ms ease;
       }
       button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
@@ -247,6 +249,11 @@ export function layout(title: string, body: string) {
       }
       .section-header h3 {
         margin: 0;
+      }
+      .card-divider {
+        height: 1px;
+        background: var(--border);
+        margin: 16px 0;
       }
       .status-pill {
         display: inline-flex;
@@ -404,9 +411,17 @@ export function renderSiteDetail(
               <button type="submit" class="secondary">Delete Site</button>
             </form>
           </div>
-        </section>
-        <section>
-          <h3>Credentials</h3>
+
+          <div class="card-divider"></div>
+
+          <div class="section-header">
+            <h3>Credentials</h3>
+            ${
+              site.username_enc && site.password_enc
+                ? `<div class="status-pill ready">Credentials saved</div>`
+                : `<div class="status-pill missing">Credentials needed</div>`
+            }
+          </div>
           <form method="post" action="/sites/${site.id}/credentials">
             <label>Username</label>
             <input name="username" placeholder="user@example.com" />
@@ -414,12 +429,7 @@ export function renderSiteDetail(
             <input name="password" type="password" />
             <button type="submit">Update</button>
           </form>
-        ${
-          site.username_enc && site.password_enc
-            ? `<div class="status-pill ready">Credentials saved</div>`
-            : `<div class="status-pill missing">Credentials needed</div>`
-        }
-      </section>
+        </section>
       </div>
 
       <section class="site-script">
