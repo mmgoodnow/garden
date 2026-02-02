@@ -102,6 +102,7 @@ export function layout(title: string, body: string) {
       .build-info {
         font-size: 12px;
         color: var(--muted);
+        margin-left: auto;
       }
       main {
         padding: 28px 28px 56px;
@@ -301,8 +302,8 @@ export function layout(title: string, body: string) {
           <a href="/">Sites</a>
           <a href="/sites/new">New Site</a>
         </nav>
+        ${renderBuildInfo()}
       </div>
-      ${renderBuildInfo()}
     </header>
     <main>
       ${body}
