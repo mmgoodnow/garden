@@ -195,6 +195,7 @@ export function layout(title: string, body: string) {
         font-weight: 600;
         width: auto;
         align-self: flex-start;
+        border-radius: 8px;
         transition: transform 120ms ease, box-shadow 120ms ease;
       }
       button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
