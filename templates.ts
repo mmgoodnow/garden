@@ -318,6 +318,38 @@ export function layout(title: string, body: string) {
         border-radius: 10px;
         border: 1px solid var(--border);
       }
+      .last-run-summary {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 6px;
+        font-size: 16px;
+        font-weight: 600;
+      }
+      .last-run-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 8px 12px;
+        margin: 10px 0 6px;
+      }
+      .last-run-item {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .last-run-item span {
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
+      .last-run-item strong {
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .last-run-error {
+        margin-top: 8px;
+      }
       details.captcha-trace {
         border: 1px solid var(--border);
         border-radius: 10px;
@@ -479,14 +511,26 @@ export function renderSiteDetail(
 
       <section>
         <h3>Last run</h3>
-        <p class="muted">Status</p>
-        <p>${renderStatus(site.last_status ?? "never")}</p>
-        <p class="muted">Ran at</p>
-        <p>${formatTimestamp(site.last_run_at)}</p>
-        <p class="muted">Last success</p>
-        <p>${formatTimestamp(site.last_success_at)}</p>
-        <p class="muted">Last error</p>
-        <pre class="error-cell">${escapeHtml(site.last_error ?? "-")}</pre>
+        <div class="last-run-summary">
+          <span>${renderStatus(site.last_status ?? "never")}</span>
+          <span class="muted">·</span>
+          <span>${formatTimestamp(site.last_run_at)}</span>
+        </div>
+        <div class="last-run-meta">
+          <div class="last-run-item">
+            <span>Last success</span>
+            <strong>${formatTimestamp(site.last_success_at)}</strong>
+          </div>
+          <div class="last-run-item">
+            <span>Last error</span>
+            <strong>${site.last_error ? "Yes" : "None"}</strong>
+          </div>
+        </div>
+        ${
+          site.last_error
+            ? `<pre class="error-cell last-run-error">${escapeHtml(site.last_error)}</pre>`
+            : ""
+        }
         ${
           lastRunShot
             ? `<div class="run-preview"><a href="/screenshots/${lastRunShot.id}"><img src="/screenshots/${lastRunShot.id}" alt="Last run screenshot" /></a></div>`
