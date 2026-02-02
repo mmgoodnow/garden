@@ -412,7 +412,7 @@ export function renderSiteDetail(
   const scriptContent = script ? escapeHtml(script.content) : "";
   const domain = site.domain.trim();
   const hasScheme = /^https?:\/\//i.test(domain);
-  const siteUrl = hasScheme ? domain : `https://${domain}`;
+  const siteUrl = hasScheme ? domain : `${defaultScheme(domain)}${domain}`;
   const lastRun = runs[0];
   const lastRunShot = lastRun ? screenshotsByRun[lastRun.id] : undefined;
   const runRows = runs
@@ -658,6 +658,19 @@ function renderStatus(status: string) {
   if (normalized === "running") return "⏳ running";
   if (normalized === "never") return "— never";
   return escapeHtml(status);
+}
+
+function defaultScheme(domain: string) {
+  const lower = domain.toLowerCase();
+  if (
+    lower.startsWith("localhost") ||
+    lower.startsWith("127.0.0.1") ||
+    lower.startsWith("[::1]") ||
+    lower.endsWith(".local")
+  ) {
+    return "http://";
+  }
+  return "https://";
 }
 
 function formatTimestamp(value: string | null | undefined) {
