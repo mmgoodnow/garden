@@ -327,8 +327,8 @@ export function renderSiteList(sites: SiteRow[]) {
         <td>${escapeHtml(site.domain)}</td>
         <td>${site.enabled ? "Enabled" : "Disabled"}</td>
         <td>${renderStatus(site.last_status ?? "never")}</td>
-        <td>${escapeHtml(site.last_run_at ?? "-")}</td>
-        <td>${escapeHtml(site.last_success_at ?? "-")}</td>
+        <td>${formatTimestamp(site.last_run_at)}</td>
+        <td>${formatTimestamp(site.last_success_at)}</td>
       </tr>`,
     )
     .join("");
@@ -393,13 +393,13 @@ export function renderSiteDetail(
     .map((run) => {
       const shot = screenshotsByRun[run.id];
       const shotCell = shot
-        ? `<a href="/screenshots/${shot.id}" title="${escapeHtml(shot.created_at)}">view</a>`
+        ? `<a href="/screenshots/${shot.id}" title="${formatTimestamp(shot.created_at)}">view</a>`
         : "-";
       return `<tr>
         <td><a href="/runs/${run.id}">#${run.id}</a></td>
         <td>${renderStatus(run.status)}</td>
-        <td>${escapeHtml(run.started_at)}</td>
-        <td>${escapeHtml(run.finished_at ?? "-")}</td>
+        <td>${formatTimestamp(run.started_at)}</td>
+        <td>${formatTimestamp(run.finished_at)}</td>
         <td>${shotCell}</td>
         <td><pre class="error-cell">${escapeHtml(run.error ?? "-")}</pre></td>
       </tr>`;
@@ -445,9 +445,9 @@ export function renderSiteDetail(
         <p class="muted">Status</p>
         <p>${renderStatus(site.last_status ?? "never")}</p>
         <p class="muted">Ran at</p>
-        <p>${escapeHtml(site.last_run_at ?? "-")}</p>
+        <p>${formatTimestamp(site.last_run_at)}</p>
         <p class="muted">Last success</p>
-        <p>${escapeHtml(site.last_success_at ?? "-")}</p>
+        <p>${formatTimestamp(site.last_success_at)}</p>
         <p class="muted">Last error</p>
         <pre class="error-cell">${escapeHtml(site.last_error ?? "-")}</pre>
         ${
@@ -579,8 +579,8 @@ export function renderRunDetail(run: RunRow, screenshot: RunScreenshotRow) {
     `<section>
       <h2>Run #${run.id}</h2>
       <p>Status: ${renderStatus(run.status)}</p>
-      <p>Started: ${escapeHtml(run.started_at)}</p>
-      <p>Finished: ${escapeHtml(run.finished_at ?? "-")}</p>
+      <p>Started: ${formatTimestamp(run.started_at)}</p>
+      <p>Finished: ${formatTimestamp(run.finished_at)}</p>
       <p>Error: ${escapeHtml(run.error ?? "-")}</p>
       ${screenshotHtml}
     </section>`,
@@ -601,4 +601,19 @@ function renderStatus(status: string) {
   if (normalized === "running") return "⏳ running";
   if (normalized === "never") return "— never";
   return escapeHtml(status);
+}
+
+const timestampFormatter = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "2-digit",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+function formatTimestamp(value: string | null | undefined) {
+  if (!value || value === "-") return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return escapeHtml(value);
+  return timestampFormatter.format(date);
 }
