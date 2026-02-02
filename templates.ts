@@ -326,7 +326,7 @@ export function renderSiteList(sites: SiteRow[]) {
         <td><a href="/sites/${site.id}">${escapeHtml(site.name)}</a></td>
         <td>${escapeHtml(site.domain)}</td>
         <td>${site.enabled ? "Enabled" : "Disabled"}</td>
-        <td>${escapeHtml(site.last_status ?? "never")}</td>
+        <td>${renderStatus(site.last_status ?? "never")}</td>
         <td>${escapeHtml(site.last_run_at ?? "-")}</td>
         <td>${escapeHtml(site.last_success_at ?? "-")}</td>
       </tr>`,
@@ -397,7 +397,7 @@ export function renderSiteDetail(
         : "-";
       return `<tr>
         <td><a href="/runs/${run.id}">#${run.id}</a></td>
-        <td>${escapeHtml(run.status)}</td>
+        <td>${renderStatus(run.status)}</td>
         <td>${escapeHtml(run.started_at)}</td>
         <td>${escapeHtml(run.finished_at ?? "-")}</td>
         <td>${shotCell}</td>
@@ -443,7 +443,7 @@ export function renderSiteDetail(
       <section>
         <h3>Last run</h3>
         <p class="muted">Status</p>
-        <p>${escapeHtml(site.last_status ?? "never")}</p>
+        <p>${renderStatus(site.last_status ?? "never")}</p>
         <p class="muted">Ran at</p>
         <p>${escapeHtml(site.last_run_at ?? "-")}</p>
         <p class="muted">Last success</p>
@@ -578,7 +578,7 @@ export function renderRunDetail(run: RunRow, screenshot: RunScreenshotRow) {
     `Run #${run.id}`,
     `<section>
       <h2>Run #${run.id}</h2>
-      <p>Status: ${escapeHtml(run.status)}</p>
+      <p>Status: ${renderStatus(run.status)}</p>
       <p>Started: ${escapeHtml(run.started_at)}</p>
       <p>Finished: ${escapeHtml(run.finished_at ?? "-")}</p>
       <p>Error: ${escapeHtml(run.error ?? "-")}</p>
@@ -592,4 +592,13 @@ function renderBuildInfo() {
   const shortSha = BUILD_INFO.sha ? BUILD_INFO.sha.slice(0, 7) : "unknown";
   const message = BUILD_INFO.message ? ` - ${escapeHtml(BUILD_INFO.message)}` : "";
   return `<div class="build-info">Commit: ${escapeHtml(shortSha)}${message}</div>`;
+}
+
+function renderStatus(status: string) {
+  const normalized = status.toLowerCase();
+  if (normalized === "success") return "✅ success";
+  if (normalized === "failed") return "❌ failed";
+  if (normalized === "running") return "⏳ running";
+  if (normalized === "never") return "— never";
+  return escapeHtml(status);
 }
