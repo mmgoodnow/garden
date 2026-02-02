@@ -233,6 +233,9 @@ export function layout(title: string, body: string) {
         max-height: 320px;
         overflow: auto;
       }
+      .live-log {
+        max-height: 220px;
+      }
       .script-textarea {
         min-height: 360px;
       }
@@ -635,12 +638,83 @@ export function renderRunDetail(
       ${screenshotHtml}
     </section>
     <section>
+      <div class="section-header">
+        <h3>Live</h3>
+        <span id="live-status" class="muted">connecting...</span>
+      </div>
+      <pre id="live-log" class="live-log"></pre>
+    </section>
+    <section>
       <h3>Captcha trace</h3>
       ${
         traceItems ||
         `<p class="muted">No captcha trace recorded for this run.</p>`
       }
-    </section>`,
+    </section>
+
+    <script>
+      (() => {
+        const logEl = document.getElementById("live-log");
+        const statusEl = document.getElementById("live-status");
+        if (!logEl || !statusEl || typeof EventSource === "undefined") return;
+
+        const source = new EventSource("/api/runs/${run.id}/events");
+        const append = (line) => {
+          logEl.textContent += line + "\\n";
+          logEl.scrollTop = logEl.scrollHeight;
+        };
+
+        const formatEvent = (event) => {
+          if (!event || !event.type) return JSON.stringify(event);
+          switch (event.type) {
+            case "run.start":
+              return "Run started";
+            case "run.attempt":
+              return "Attempt " + event.attempt + "/" + event.total;
+            case "run.attempt.failed":
+              return "Attempt " + event.attempt + " failed: " + (event.error || "");
+            case "step.start": {
+              const step = event.step || {};
+              const target = step.url || step.locator || "";
+              return "Step " + event.index + "/" + event.total + ": " + step.type + (target ? " → " + target : "");
+            }
+            case "captcha.request":
+              return "Captcha request (attempt " + event.attempt + ")";
+            case "captcha.response":
+              return "Captcha response (" + (event.steps ? event.steps.length : 0) + " steps)";
+            case "captcha.error":
+              return "Captcha error: " + (event.error || "");
+            case "run.success":
+              return "Run finished ✅";
+            case "run.failed":
+              return "Run failed ❌: " + (event.error || "");
+            default:
+              return event.type + " " + JSON.stringify(event);
+          }
+        };
+
+        source.addEventListener("ready", () => {
+          statusEl.textContent = "connected";
+        });
+
+        source.addEventListener("message", (evt) => {
+          try {
+            const payload = JSON.parse(evt.data);
+            append(formatEvent(payload));
+            if (payload.type === "run.success" || payload.type === "run.failed") {
+              statusEl.textContent = "completed";
+              source.close();
+            }
+          } catch {
+            append(evt.data);
+          }
+        });
+
+        source.addEventListener("error", () => {
+          statusEl.textContent = "disconnected";
+        });
+      })();
+    </script>`,
   );
 }
 

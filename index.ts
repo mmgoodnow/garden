@@ -4,6 +4,7 @@ import { encryptSecret } from "./crypto";
 import { parseScript } from "./script";
 import { runSite } from "./runner";
 import { startScheduler } from "./scheduler";
+import { subscribeRunEvents } from "./events";
 import {
   layout,
   renderNewSite,
@@ -226,6 +227,23 @@ Bun.serve({
         return htmlResponse(
           renderRunDetail(run, screenshot ?? null, captchaTraces),
         );
+      },
+    },
+    "/api/runs/:id/events": {
+      GET: async (req) => {
+        const runId = Number(req.params.id);
+        if (!Number.isFinite(runId)) {
+          return new Response("Run id required.", { status: 400 });
+        }
+        const stream = subscribeRunEvents(runId);
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+            "X-Accel-Buffering": "no",
+          },
+        });
       },
     },
     "/screenshots/:id": {

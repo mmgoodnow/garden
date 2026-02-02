@@ -1,5 +1,6 @@
 import { chromium, type Locator, type Page } from "playwright";
 import { db } from "./db";
+import { emitRunEvent } from "./events";
 import { decryptSecret } from "./crypto";
 import { parseScript, type RecordedScript, type Step } from "./script";
 
@@ -59,6 +60,12 @@ export async function runSite(siteId: number) {
   }
   const startedAt = Date.now();
   console.log(`[runner] starting run ${runId} for site ${siteId}`);
+  emitRunEvent(runId, {
+    type: "run.start",
+    runId,
+    siteId,
+    startedAt: now,
+  });
 
   try {
     const secrets = buildSecrets(site.username_enc, site.password_enc, script);
@@ -87,10 +94,21 @@ export async function runSite(siteId: number) {
       .where("id", "=", siteId)
       .execute();
     console.log(`[runner] run ${runId} success (${duration}ms)`);
+    emitRunEvent(runId, {
+      type: "run.success",
+      runId,
+      durationMs: duration,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const duration = Date.now() - startedAt;
     console.error(`[runner] run ${runId} failed (${duration}ms): ${message}`);
+    emitRunEvent(runId, {
+      type: "run.failed",
+      runId,
+      durationMs: duration,
+      error: message,
+    });
     await db
       .updateTable("runs")
       .set({
@@ -129,11 +147,24 @@ async function runScript(
   let captchaSequence = 0;
 
   try {
-    for (const step of script.steps) {
+    for (const [index, step] of script.steps.entries()) {
       if (step.type === "captcha") {
         captchaSequence += 1;
       }
+      emitRunEvent(runId, {
+        type: "step.start",
+        attempt,
+        index: index + 1,
+        total: script.steps.length,
+        step: summarizeStep(step),
+      });
       await runStep(page, step, secrets, runId, attempt, captchaSequence, captchaError);
+      emitRunEvent(runId, {
+        type: "step.done",
+        attempt,
+        index: index + 1,
+        total: script.steps.length,
+      });
       if (step.type === "captcha") {
         captchaError = undefined;
       }
@@ -158,6 +189,12 @@ async function runScriptWithRetries(
   let lastCaptchaError: string | undefined;
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
     console.log(`[runner] run ${runId} attempt ${attempt}/${attempts}`);
+    emitRunEvent(runId, {
+      type: "run.attempt",
+      runId,
+      attempt,
+      total: attempts,
+    });
     try {
       await runScript(script, secrets, runId, attempt, lastCaptchaError);
       return;
@@ -168,6 +205,12 @@ async function runScriptWithRetries(
       }
       const message = error instanceof Error ? error.message : String(error);
       console.error(`[runner] run ${runId} attempt ${attempt} failed: ${message}`);
+      emitRunEvent(runId, {
+        type: "run.attempt.failed",
+        runId,
+        attempt,
+        error: message,
+      });
       if (attempt < attempts) {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
@@ -234,6 +277,14 @@ async function runStep(
     }
     return locator.selectOption(value);
   }
+}
+
+function summarizeStep(step: Step) {
+  return {
+    type: step.type,
+    locator: step.locator ?? null,
+    url: step.type === "goto" ? step.url ?? null : null,
+  };
 }
 
 type CaptchaModelStep = {
@@ -384,6 +435,13 @@ async function solveCaptcha(
     previousError,
     secrets,
   );
+  emitRunEvent(runId, {
+    type: "captcha.request",
+    runId,
+    attempt,
+    sequence,
+    model: request.model,
+  });
   try {
     const response = await requestCaptchaSteps(request);
     modelSteps = response.steps;
@@ -396,6 +454,14 @@ async function solveCaptcha(
       response: response.responseText,
       error: null,
     });
+    emitRunEvent(runId, {
+      type: "captcha.response",
+      runId,
+      attempt,
+      sequence,
+      model: request.model,
+      steps: summarizeCaptchaSteps(modelSteps),
+    });
   } catch (error) {
     await recordCaptchaTrace({
       run_id: runId,
@@ -404,6 +470,14 @@ async function solveCaptcha(
       model: request.model,
       prompt: request.prompt,
       response: null,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    emitRunEvent(runId, {
+      type: "captcha.error",
+      runId,
+      attempt,
+      sequence,
+      model: request.model,
       error: error instanceof Error ? error.message : String(error),
     });
     throw new CaptchaSolveError(
@@ -670,6 +744,14 @@ function normalizeCaptchaStep(step: CaptchaModelStep): Step {
     value: step.value,
     args: step.args,
   };
+}
+
+function summarizeCaptchaSteps(steps: CaptchaModelStep[]) {
+  return steps.map((step) => ({
+    type: step.type,
+    locator: step.locator ?? step.selector ?? null,
+    value: step.value ?? null,
+  }));
 }
 
 function scopeCaptchaSelector(locator: string): string {
