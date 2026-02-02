@@ -248,6 +248,28 @@ export function layout(title: string, body: string) {
       .section-header h3 {
         margin: 0;
       }
+      .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 600;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        color: var(--muted);
+      }
+      .status-pill.ready {
+        border-color: color-mix(in srgb, var(--accent), var(--border) 60%);
+        background: color-mix(in srgb, var(--accent), transparent 92%);
+        color: var(--accent);
+      }
+      .status-pill.missing {
+        border-color: color-mix(in srgb, #c23b22, var(--border) 70%);
+        background: color-mix(in srgb, #c23b22, transparent 92%);
+        color: #c23b22;
+      }
       .run-screenshot {
         margin-top: 12px;
       }
@@ -392,12 +414,12 @@ export function renderSiteDetail(
             <input name="password" type="password" />
             <button type="submit">Update</button>
           </form>
-          <p class="muted">
-            Stored: ${
-              site.username_enc && site.password_enc ? "yes" : "no"
-            }
-          </p>
-        </section>
+        ${
+          site.username_enc && site.password_enc
+            ? `<div class="status-pill ready">Credentials saved</div>`
+            : `<div class="status-pill missing">Credentials needed</div>`
+        }
+      </section>
       </div>
 
       <section class="site-script">
