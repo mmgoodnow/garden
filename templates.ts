@@ -48,6 +48,14 @@ type CaptchaTraceRow = {
   created_at: string;
 };
 
+type RunEventRow = {
+  id: number;
+  run_id: number;
+  type: string;
+  payload: string;
+  created_at: string;
+};
+
 export function layout(title: string, body: string) {
   return `<!doctype html>
 <html lang="en">
@@ -600,6 +608,7 @@ export function renderRunDetail(
   run: RunRow,
   screenshot: RunScreenshotRow,
   traces: CaptchaTraceRow[],
+  events: RunEventRow[],
 ) {
   const screenshotHtml = screenshot
     ? `<div class="run-screenshot">
@@ -627,6 +636,11 @@ export function renderRunDetail(
     })
     .join("");
 
+  const history = events
+    .map((event) => formatRunEvent(event.payload))
+    .filter(Boolean)
+    .join("\n");
+
   return layout(
     `Run #${run.id}`,
     `<section>
@@ -642,7 +656,7 @@ export function renderRunDetail(
         <h3>Live</h3>
         <span id="live-status" class="muted">connecting...</span>
       </div>
-      <pre id="live-log" class="live-log"></pre>
+      <pre id="live-log" class="live-log">${escapeHtml(history)}</pre>
     </section>
     <section>
       <h3>Captcha trace</h3>
@@ -787,4 +801,50 @@ function formatTimestamp(value: string | null | undefined) {
   }
   const years = Math.round(absMs / (365 * 24 * 60 * 60 * 1000));
   return rtf.format(direction * years, "year");
+}
+
+function formatRunEvent(payload: string) {
+  try {
+    const event = JSON.parse(payload);
+    return formatRunEventObject(event);
+  } catch {
+    return payload;
+  }
+}
+
+function formatRunEventObject(event: {
+  type?: string;
+  [key: string]: unknown;
+}) {
+  if (!event || !event.type) return "";
+  switch (event.type) {
+    case "run.start":
+      return "Run started";
+    case "run.attempt":
+      return `Attempt ${event.attempt ?? ""}/${event.total ?? ""}`.trim();
+    case "run.attempt.failed":
+      return `Attempt ${event.attempt ?? ""} failed: ${event.error ?? ""}`.trim();
+    case "step.start": {
+      const step = (event.step as { type?: string; locator?: string; url?: string }) ?? {};
+      const target = step.url || step.locator || "";
+      const base = `Step ${event.index ?? ""}/${event.total ?? ""}: ${step.type ?? ""}`.trim();
+      return target ? `${base} → ${target}` : base;
+    }
+    case "captcha.request":
+      return `Captcha request (attempt ${event.attempt ?? ""})`.trim();
+    case "captcha.response": {
+      const steps = Array.isArray(event.steps) ? event.steps.length : 0;
+      return `Captcha response (${steps} steps)`;
+    }
+    case "captcha.error":
+      return `Captcha error: ${event.error ?? ""}`.trim();
+    case "run.success":
+      return "Run finished ✅";
+    case "run.failed":
+      return `Run failed ❌: ${event.error ?? ""}`.trim();
+    case "auto.goto":
+      return `Auto-navigate → ${event.url ?? ""}`.trim();
+    default:
+      return `${event.type} ${JSON.stringify(event)}`.trim();
+  }
 }

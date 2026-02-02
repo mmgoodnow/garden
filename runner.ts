@@ -456,6 +456,7 @@ async function solveCaptcha(
   );
 
   let modelSteps: CaptchaModelStep[];
+  let responseText = "";
   const request = buildCaptchaRequest(
     page.url(),
     htmlWithMarkers,
@@ -474,15 +475,7 @@ async function solveCaptcha(
   try {
     const response = await requestCaptchaSteps(request);
     modelSteps = response.steps;
-    await recordCaptchaTrace({
-      run_id: runId,
-      attempt,
-      sequence,
-      model: request.model,
-      prompt: request.prompt,
-      response: response.responseText,
-      error: null,
-    });
+    responseText = response.responseText;
     emitRunEvent(runId, {
       type: "captcha.response",
       runId,
@@ -516,15 +509,50 @@ async function solveCaptcha(
   }
 
   if (!modelSteps.length) {
+    await recordCaptchaTrace({
+      run_id: runId,
+      attempt,
+      sequence,
+      model: request.model,
+      prompt: request.prompt,
+      response: responseText || null,
+      error: "Captcha solver returned no steps.",
+    });
     throw new CaptchaSolveError("Captcha solver returned no steps.");
   }
 
   try {
     for (const modelStep of modelSteps) {
       const normalized = normalizeCaptchaStep(modelStep);
-      await runStep(page, normalized, secrets);
+      await runStep(page, normalized, secrets, runId, attempt, sequence);
     }
+    await recordCaptchaTrace({
+      run_id: runId,
+      attempt,
+      sequence,
+      model: request.model,
+      prompt: request.prompt,
+      response: responseText || null,
+      error: null,
+    });
   } catch (error) {
+    await recordCaptchaTrace({
+      run_id: runId,
+      attempt,
+      sequence,
+      model: request.model,
+      prompt: request.prompt,
+      response: responseText || null,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    emitRunEvent(runId, {
+      type: "captcha.error",
+      runId,
+      attempt,
+      sequence,
+      model: request.model,
+      error: error instanceof Error ? error.message : String(error),
+    });
     throw new CaptchaSolveError(
       error instanceof Error ? error.message : String(error),
       error,
@@ -633,8 +661,6 @@ function buildCaptchaRequest(
     : "";
 
   const userText = [
-    `Page URL: ${pageUrl}`,
-    "",
     "HTML fragment for the captcha section:",
     html,
     "",

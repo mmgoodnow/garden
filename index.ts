@@ -225,8 +225,14 @@ Bun.serve({
           .where("run_id", "=", runId)
           .orderBy("created_at", "asc")
           .execute();
+        const runEvents = await db
+          .selectFrom("run_events")
+          .selectAll()
+          .where("run_id", "=", runId)
+          .orderBy("created_at", "asc")
+          .execute();
         return htmlResponse(
-          renderRunDetail(run, screenshot ?? null, captchaTraces),
+          renderRunDetail(run, screenshot ?? null, captchaTraces, runEvents),
         );
       },
     },

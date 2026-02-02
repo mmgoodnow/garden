@@ -56,12 +56,21 @@ export type CaptchaTracesTable = {
   created_at: string;
 };
 
+export type RunEventsTable = {
+  id: Generated<number>;
+  run_id: number;
+  type: string;
+  payload: string;
+  created_at: string;
+};
+
 export type DB = {
   sites: SitesTable;
   scripts: ScriptsTable;
   runs: RunsTable;
   screenshots: ScreenshotsTable;
   captcha_traces: CaptchaTracesTable;
+  run_events: RunEventsTable;
 };
 
 export const sqlite = createSqlite();
@@ -136,6 +145,16 @@ export async function initDb() {
     .addColumn("prompt", "text", (col) => col.notNull())
     .addColumn("response", "text")
     .addColumn("error", "text")
+    .addColumn("created_at", "text", (col) => col.notNull())
+    .execute();
+
+  await db.schema
+    .createTable("run_events")
+    .ifNotExists()
+    .addColumn("id", "integer", (col) => col.primaryKey().autoIncrement())
+    .addColumn("run_id", "integer", (col) => col.notNull())
+    .addColumn("type", "text", (col) => col.notNull())
+    .addColumn("payload", "text", (col) => col.notNull())
     .addColumn("created_at", "text", (col) => col.notNull())
     .execute();
 }

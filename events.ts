@@ -1,5 +1,8 @@
+import { db } from "./db";
+
 type RunEvent = {
   type: string;
+  runId?: number;
   [key: string]: unknown;
 };
 
@@ -47,13 +50,16 @@ export function subscribeRunEvents(runId: number) {
 
 export function emitRunEvent(runId: number, event: RunEvent) {
   const clients = clientsByRun.get(runId);
-  if (!clients || clients.size === 0) return;
 
-  for (const client of Array.from(clients)) {
-    if (!sendEvent(client.controller, event, "message")) {
-      cleanupClient(runId, client);
+  if (clients && clients.size > 0) {
+    for (const client of Array.from(clients)) {
+      if (!sendEvent(client.controller, event, "message")) {
+        cleanupClient(runId, client);
+      }
     }
   }
+
+  void persistRunEvent(runId, event);
 }
 
 function sendEvent(
@@ -89,5 +95,25 @@ function cleanupClient(runId: number, client: Client) {
   clients.delete(client);
   if (clients.size === 0) {
     clientsByRun.delete(runId);
+  }
+}
+
+async function persistRunEvent(runId: number, event: RunEvent) {
+  try {
+    await db
+      .insertInto("run_events")
+      .values({
+        run_id: runId,
+        type: event.type,
+        payload: JSON.stringify(event),
+        created_at: new Date().toISOString(),
+      })
+      .execute();
+  } catch (error) {
+    console.warn(
+      `[events] failed to persist run event ${event.type} for ${runId}: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
   }
 }
