@@ -223,6 +223,15 @@ export function layout(title: string, body: string) {
         flex-wrap: wrap;
         gap: 10px;
       }
+      .inline-actions {
+        display: inline-flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .inline-actions button {
+        width: auto;
+      }
       @media (max-width: 720px) {
         header { padding: 16px 18px; }
         main { padding: 20px 18px 44px; }
@@ -367,13 +376,9 @@ export function renderSiteDetail(
 
       <section class="site-script">
       <h3>Script</h3>
-      <div class="muted" style="margin-bottom: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
-        <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">
-          Copy CLI command
-        </button>
-        <button type="button" class="secondary" id="open-iterm">
-          Open in iTerm
-        </button>
+      <div class="muted inline-actions" style="margin-bottom: 8px;">
+        <button type="button" class="secondary" id="copy-cli" data-site-id="${site.id}">Copy CLI command</button>
+        <button type="button" class="secondary" id="open-iterm">Open in iTerm</button>
         <span id="cli-status" class="muted" style="margin-left: 8px;"></span>
       </div>
       <form method="post" action="/sites/${site.id}/script">
