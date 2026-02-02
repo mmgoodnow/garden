@@ -8,6 +8,7 @@
     "helper": "bun helper.ts",
     "dev": "bun --hot index.ts",
     "mock:site": "bun testing/mock-site.ts",
+    "seed": "bun scripts/seed.ts",
     "start": "bun index.ts",
     "test": "bun test"
   },
