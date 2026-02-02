@@ -31,6 +31,11 @@ type ScreenshotRow = {
   created_at: string;
 };
 
+type RunScreenshotRow = {
+  id: number;
+  created_at: string;
+} | null;
+
 export function layout(title: string, body: string) {
   return `<!doctype html>
 <html lang="en">
@@ -242,6 +247,16 @@ export function layout(title: string, body: string) {
       }
       .section-header h3 {
         margin: 0;
+      }
+      .run-screenshot {
+        margin-top: 12px;
+      }
+      .run-screenshot img {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        box-shadow: var(--shadow);
       }
       @media (max-width: 720px) {
         header { padding: 16px 18px; }
@@ -496,7 +511,13 @@ export function renderSiteDetail(
   );
 }
 
-export function renderRunDetail(run: RunRow) {
+export function renderRunDetail(run: RunRow, screenshot: RunScreenshotRow) {
+  const screenshotHtml = screenshot
+    ? `<div class="run-screenshot">
+        <img src="/screenshots/${screenshot.id}" alt="Run screenshot" />
+      </div>`
+    : `<p class="muted">No screenshot captured for this run.</p>`;
+
   return layout(
     `Run #${run.id}`,
     `<section>
@@ -505,6 +526,7 @@ export function renderRunDetail(run: RunRow) {
       <p>Started: ${escapeHtml(run.started_at)}</p>
       <p>Finished: ${escapeHtml(run.finished_at ?? "-")}</p>
       <p>Error: ${escapeHtml(run.error ?? "-")}</p>
+      ${screenshotHtml}
     </section>`,
   );
 }

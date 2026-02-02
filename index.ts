@@ -210,7 +210,14 @@ Bun.serve({
         if (!run) {
           return htmlResponse(layout("Not Found", `<section>Run not found.</section>`), 404);
         }
-        return htmlResponse(renderRunDetail(run));
+        const screenshot = await db
+          .selectFrom("screenshots")
+          .select(["id", "created_at"])
+          .where("run_id", "=", runId)
+          .orderBy("created_at", "desc")
+          .limit(1)
+          .executeTakeFirst();
+        return htmlResponse(renderRunDetail(run, screenshot ?? null));
       },
     },
     "/screenshots/:id": {
