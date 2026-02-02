@@ -116,6 +116,10 @@ function buildCredentials() {
 }
 
 function buildSampleScript(domain: string) {
+  const trimmed = domain.trim();
+  const hasScheme = /^https?:\/\//i.test(trimmed);
+  const base = hasScheme ? trimmed : `${defaultScheme(trimmed)}${trimmed}`;
+  const baseUrl = base.replace(/\/$/, "");
   return {
     meta: {
       source: "seed",
@@ -123,16 +127,29 @@ function buildSampleScript(domain: string) {
       recordedAt: new Date().toISOString(),
     },
     steps: [
-      { type: "goto", url: `https://${domain}/login` },
+      { type: "goto", url: `${baseUrl}/login` },
       { type: "fill", locator: "page.getByLabel('Username')", value: "{{username}}" },
       { type: "fill", locator: "page.getByLabel('Password')", value: "{{password}}" },
       { type: "captcha", steps: [{ type: "click", locator: "#captcha" }] },
       { type: "click", locator: "page.getByRole('button', { name: 'Sign in' })" },
-      { type: "goto", url: `https://${domain}/dashboard` },
+      { type: "goto", url: `${baseUrl}/dashboard` },
     ],
     secrets: [
       { placeholder: "{{username}}", kind: "username" },
       { placeholder: "{{password}}", kind: "password" },
     ],
   };
+}
+
+function defaultScheme(domain: string) {
+  const lower = domain.toLowerCase();
+  if (
+    lower.startsWith("localhost") ||
+    lower.startsWith("127.0.0.1") ||
+    lower.startsWith("[::1]") ||
+    lower.endsWith(".local")
+  ) {
+    return "http://";
+  }
+  return "https://";
 }
