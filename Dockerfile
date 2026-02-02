@@ -3,6 +3,8 @@ FROM oven/bun:1.3.2
 ARG GIT_COMMIT_SHA=""
 ARG GIT_COMMIT_MESSAGE=""
 
+ENV DEBIAN_FRONTEND=noninteractive
+
 WORKDIR /app
 
 COPY package.json bun.lock ./
