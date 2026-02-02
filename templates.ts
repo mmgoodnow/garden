@@ -154,15 +154,12 @@ export function layout(title: string, body: string) {
         align-items: flex-start;
         flex-wrap: wrap;
       }
-      .site-stack {
-        display: flex;
-        flex-direction: column;
-        gap: 16px;
-        flex: 0 1 320px;
-        max-width: 360px;
+      .site-top > section {
+        flex: 1 1 280px;
+        min-width: 260px;
       }
       .site-script {
-        flex: 1 1 520px;
+        flex: 2 1 520px;
         min-width: 320px;
       }
       .runs-table {
@@ -401,38 +398,48 @@ export function renderSiteDetail(
   return layout(
     site.name,
     `<div class="site-top">
-      <div class="site-stack">
-        <section>
-          <h2>${escapeHtml(site.name)}</h2>
-          <p class="muted">${escapeHtml(site.domain)}</p>
-          <div class="actions">
-            <form method="post" action="/sites/${site.id}/run">
-              <button type="submit">Run Now</button>
-            </form>
-            <form method="post" action="/sites/${site.id}/delete" onsubmit="return confirm('Delete this site and all related data?');">
-              <button type="submit" class="secondary">Delete Site</button>
-            </form>
-          </div>
-
-          <div class="card-divider"></div>
-
-          <div class="section-header">
-            <h3>Credentials</h3>
-            ${
-              site.username_enc && site.password_enc
-                ? `<div class="status-pill ready">Credentials saved</div>`
-                : `<div class="status-pill missing">Credentials needed</div>`
-            }
-          </div>
-          <form method="post" action="/sites/${site.id}/credentials">
-            <label>Username</label>
-            <input name="username" placeholder="user@example.com" />
-            <label>Password</label>
-            <input name="password" type="password" />
-            <button type="submit">Update</button>
+      <section>
+        <h2>${escapeHtml(site.name)}</h2>
+        <p class="muted">${escapeHtml(site.domain)}</p>
+        <div class="actions">
+          <form method="post" action="/sites/${site.id}/run">
+            <button type="submit">Run Now</button>
           </form>
-        </section>
-      </div>
+          <form method="post" action="/sites/${site.id}/delete" onsubmit="return confirm('Delete this site and all related data?');">
+            <button type="submit" class="secondary">Delete Site</button>
+          </form>
+        </div>
+
+        <div class="card-divider"></div>
+
+        <div class="section-header">
+          <h3>Credentials</h3>
+          ${
+            site.username_enc && site.password_enc
+              ? `<div class="status-pill ready">Credentials saved</div>`
+              : `<div class="status-pill missing">Credentials needed</div>`
+          }
+        </div>
+        <form method="post" action="/sites/${site.id}/credentials">
+          <label>Username</label>
+          <input name="username" placeholder="user@example.com" />
+          <label>Password</label>
+          <input name="password" type="password" />
+          <button type="submit">Update</button>
+        </form>
+      </section>
+
+      <section>
+        <h3>Last run</h3>
+        <p class="muted">Status</p>
+        <p>${escapeHtml(site.last_status ?? "never")}</p>
+        <p class="muted">Ran at</p>
+        <p>${escapeHtml(site.last_run_at ?? "-")}</p>
+        <p class="muted">Last success</p>
+        <p>${escapeHtml(site.last_success_at ?? "-")}</p>
+        <p class="muted">Last error</p>
+        <pre class="error-cell">${escapeHtml(site.last_error ?? "-")}</pre>
+      </section>
 
       <section class="site-script">
       <form method="post" action="/sites/${site.id}/script">
@@ -445,7 +452,6 @@ export function renderSiteDetail(
             <span id="cli-status" class="muted"></span>
           </div>
         </div>
-        <label>Recorded JSON</label>
         <textarea name="script" rows="18" class="script-textarea" data-script-id="${scriptId}">${scriptContent}</textarea>
       </form>
       </section>
