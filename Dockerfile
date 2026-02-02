@@ -10,7 +10,7 @@ ENV PATH=/root/.bun/bin:$PATH
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends curl ca-certificates \
+  && apt-get install -y --no-install-recommends curl ca-certificates unzip \
   && curl -fsSL https://bun.sh/install | bash \
   && rm -rf /var/lib/apt/lists/*
 
