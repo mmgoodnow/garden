@@ -1,0 +1,33 @@
+FROM node:20-bookworm
+
+WORKDIR /app
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV BUN_INSTALL=/root/.bun
+ENV PATH=/root/.bun/bin:$PATH
+
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl ca-certificates unzip \
+  && curl -fsSL https://bun.sh/install | bash \
+  && rm -rf /var/lib/apt/lists/*
+
+COPY package.json bun.lock ./
+RUN bun install --production
+
+RUN npx playwright install --with-deps chromium chromium-headless-shell
+
+COPY . .
+
+RUN bun scripts/build-info.ts /app/build-info.json && rm -rf .git
+
+ENV PORT=80
+ENV DATA_DIR=/config
+ENV DB_PATH=/config/garden.db
+ENV BUILD_INFO_PATH=/app/build-info.json
+
+RUN mkdir -p /config
+
+VOLUME ["/config"]
+EXPOSE 80
+
+CMD ["bun", "index.ts"]
