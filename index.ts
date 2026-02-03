@@ -1,4 +1,28 @@
-import { initDb, db } from "./db";
+import express from "express";
+import multer from "multer";
+import {
+  deleteRunsBySiteId,
+  deleteScreenshotsByRunIds,
+  deleteScriptsBySiteId,
+  deleteSitesById,
+  getLatestScreenshotForRun,
+  getRunById,
+  getScreenshotById,
+  getSiteByDomain,
+  getSiteById,
+  getSiteIdByDomain,
+  getLatestScriptForSite,
+  initDb,
+  insertScript,
+  insertSite,
+  listCaptchaTracesForRun,
+  listRunEventsForRun,
+  listRunsBySite,
+  listRunsForSite,
+  listScreenshotsForRuns,
+  listSites,
+  updateSite,
+} from "./db";
 import { BUILD_INFO, PORT } from "./config";
 import { encryptSecret } from "./crypto";
 import { parseScript } from "./script";
@@ -22,403 +46,317 @@ if (process.argv.includes("--version")) {
 
 await initDb();
 
-Bun.serve({
-  port: PORT,
-  idleTimeout: 60,
-  routes: {
-    "/": {
-      GET: async () => {
-        const sites = await db.selectFrom("sites").selectAll().orderBy("id").execute();
-        return htmlResponse(renderSiteList(sites));
-      },
-    },
-    "/sites/new": {
-      GET: async () => htmlResponse(renderNewSite()),
-    },
-    "/sites": {
-      POST: async (req) => {
-        const form = await req.formData();
-        const name = String(form.get("name") ?? "").trim();
-        const domain = String(form.get("domain") ?? "").trim();
-        if (!name || !domain) {
-          return htmlResponse(layout("Error", `<section>Missing name or domain.</section>`), 400);
-        }
-        const existing = await db
-          .selectFrom("sites")
-          .select("id")
-          .where("domain", "=", domain)
-          .executeTakeFirst();
-        if (existing) {
-          return htmlResponse(
-            layout("Error", `<section>Domain already exists.</section>`),
-            400,
-          );
-        }
-        const now = new Date().toISOString();
-        const result = await db
-          .insertInto("sites")
-          .values({
-            name,
-            domain,
-            enabled: 1,
-            created_at: now,
-            updated_at: now,
-            last_run_at: null,
-            last_success_at: null,
-            last_status: null,
-            last_error: null,
-            username_enc: null,
-            password_enc: null,
-          })
-          .executeTakeFirst();
+const app = express();
+const upload = multer();
+app.use(express.urlencoded({ extended: false }));
+app.use(express.json({ limit: "5mb" }));
 
-        const siteId = Number(result.insertId ?? 0);
-        return redirect(siteId ? `/sites/${encodeURIComponent(domain)}` : "/");
-      },
-    },
-    "/sites/:domain": {
-      GET: async (req) => {
-        const domainParam = String(req.params.domain ?? "").trim();
-        if (!domainParam) {
-          return htmlResponse(layout("Not Found", `<section>Site not found.</section>`), 404);
-        }
-
-        const site = await db
-          .selectFrom("sites")
-          .selectAll()
-          .where("domain", "=", domainParam)
-          .executeTakeFirst();
-
-        if (!site) {
-          const numericId = Number(domainParam);
-          if (Number.isFinite(numericId)) {
-            const fallback = await db
-              .selectFrom("sites")
-              .select(["id", "domain"])
-              .where("id", "=", numericId)
-              .executeTakeFirst();
-            if (fallback) {
-              return redirect(`/sites/${encodeURIComponent(fallback.domain)}`);
-            }
-          }
-          return htmlResponse(layout("Not Found", `<section>Site not found.</section>`), 404);
-        }
-
-        const script = await db
-          .selectFrom("scripts")
-          .selectAll()
-          .where("site_id", "=", site.id)
-          .orderBy("created_at", "desc")
-          .limit(1)
-          .executeTakeFirst();
-
-        const runs = await db
-          .selectFrom("runs")
-          .selectAll()
-          .where("site_id", "=", site.id)
-          .orderBy("started_at", "desc")
-          .limit(10)
-          .execute();
-
-        const runIds = runs.map((run) => run.id);
-        const screenshotsByRun: Record<number, { id: number; run_id: number; created_at: string }> = {};
-
-        if (runIds.length > 0) {
-          const screenshots = await db
-            .selectFrom("screenshots")
-            .select(["id", "run_id", "created_at"])
-            .where("run_id", "in", runIds)
-            .orderBy("created_at", "desc")
-            .execute();
-
-          for (const shot of screenshots) {
-            if (!screenshotsByRun[shot.run_id]) {
-              screenshotsByRun[shot.run_id] = shot;
-            }
-          }
-        }
-
-        return htmlResponse(
-          renderSiteDetail(site, script ?? null, runs, screenshotsByRun),
-        );
-      },
-    },
-    "/sites/:domain/credentials": {
-      POST: async (req) => {
-        const domainParam = String(req.params.domain ?? "").trim();
-        const form = await req.formData();
-        const username = String(form.get("username") ?? "").trim();
-        const password = String(form.get("password") ?? "").trim();
-
-        try {
-          const site = await db
-            .selectFrom("sites")
-            .select("id")
-            .where("domain", "=", domainParam)
-            .executeTakeFirst();
-          if (!site) {
-            return htmlResponse(layout("Error", `<section>Site not found.</section>`), 404);
-          }
-          const values: {
-            username_enc?: string | null;
-            password_enc?: string | null;
-            updated_at: string;
-          } = { updated_at: new Date().toISOString() };
-
-          values.username_enc = username ? encryptSecret(username) : null;
-          values.password_enc = password ? encryptSecret(password) : null;
-
-          await db.updateTable("sites").set(values).where("id", "=", site.id).execute();
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return htmlResponse(layout("Error", `<section>${message}</section>`), 400);
-        }
-
-        return redirect(`/sites/${encodeURIComponent(domainParam)}`);
-      },
-    },
-    "/sites/:domain/script": {
-      POST: async (req) => {
-        const domainParam = String(req.params.domain ?? "").trim();
-        const site = await db
-          .selectFrom("sites")
-          .select("id")
-          .where("domain", "=", domainParam)
-          .executeTakeFirst();
-        if (!site) {
-          return htmlResponse(layout("Error", `<section>Site not found.</section>`), 404);
-        }
-        const form = await req.formData();
-        const scriptText = String(form.get("script") ?? "").trim();
-        if (!scriptText) {
-          return htmlResponse(layout("Error", `<section>Script cannot be empty.</section>`), 400);
-        }
-        try {
-          parseScript(scriptText);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return htmlResponse(layout("Error", `<section>${message}</section>`), 400);
-        }
-
-        await db
-          .insertInto("scripts")
-          .values({
-            site_id: site.id,
-            content: scriptText,
-            created_at: new Date().toISOString(),
-          })
-          .execute();
-
-        return redirect(`/sites/${encodeURIComponent(domainParam)}`);
-      },
-    },
-    "/sites/:domain/run": {
-      POST: async (req) => {
-        const domainParam = String(req.params.domain ?? "").trim();
-        const site = await db
-          .selectFrom("sites")
-          .select("id")
-          .where("domain", "=", domainParam)
-          .executeTakeFirst();
-        if (!site) {
-          return htmlResponse(layout("Error", `<section>Site not found.</section>`), 404);
-        }
-        runSite(site.id).catch((error) => {
-          console.error("Run failed", error);
-        });
-        return redirect(`/sites/${encodeURIComponent(domainParam)}`);
-      },
-    },
-    "/sites/:domain/delete": {
-      POST: async (req) => {
-        const domainParam = String(req.params.domain ?? "").trim();
-        const site = await db
-          .selectFrom("sites")
-          .select("id")
-          .where("domain", "=", domainParam)
-          .executeTakeFirst();
-        if (!site) {
-          return htmlResponse(layout("Not Found", `<section>Site not found.</section>`), 404);
-        }
-
-        const runIds = await db
-          .selectFrom("runs")
-          .select("id")
-          .where("site_id", "=", site.id)
-          .execute();
-        const ids = runIds.map((row) => row.id);
-
-        if (ids.length) {
-          await db.deleteFrom("screenshots").where("run_id", "in", ids).execute();
-        }
-
-        await db.deleteFrom("runs").where("site_id", "=", site.id).execute();
-        await db.deleteFrom("scripts").where("site_id", "=", site.id).execute();
-        await db.deleteFrom("sites").where("id", "=", site.id).execute();
-
-        return redirect("/");
-      },
-    },
-    "/runs/:id": {
-      GET: async (req) => {
-        const runId = Number(req.params.id);
-        const run = await db
-          .selectFrom("runs")
-          .selectAll()
-          .where("id", "=", runId)
-          .executeTakeFirst();
-        if (!run) {
-          return htmlResponse(layout("Not Found", `<section>Run not found.</section>`), 404);
-        }
-        const screenshot = await db
-          .selectFrom("screenshots")
-          .select(["id", "created_at"])
-          .where("run_id", "=", runId)
-          .orderBy("created_at", "desc")
-          .limit(1)
-          .executeTakeFirst();
-        const captchaTraces = await db
-          .selectFrom("captcha_traces")
-          .selectAll()
-          .where("run_id", "=", runId)
-          .orderBy("created_at", "asc")
-          .execute();
-        const runEvents = await db
-          .selectFrom("run_events")
-          .selectAll()
-          .where("run_id", "=", runId)
-          .orderBy("created_at", "asc")
-          .execute();
-        return htmlResponse(
-          renderRunDetail(run, screenshot ?? null, captchaTraces, runEvents),
-        );
-      },
-    },
-    "/api/runs/:id/events": {
-      GET: async (req) => {
-        const runId = Number(req.params.id);
-        if (!Number.isFinite(runId)) {
-          return new Response("Run id required.", { status: 400 });
-        }
-        const stream = subscribeRunEvents(runId);
-        return new Response(stream, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-            "X-Accel-Buffering": "no",
-          },
-        });
-      },
-    },
-    "/screenshots/:id": {
-      GET: async (req) => {
-        const shotId = Number(req.params.id);
-        const shot = await db
-          .selectFrom("screenshots")
-          .selectAll()
-          .where("id", "=", shotId)
-          .executeTakeFirst();
-        if (!shot) {
-          return new Response("Not found", { status: 404 });
-        }
-        return new Response(shot.data, {
-          headers: { "Content-Type": shot.mime_type || "image/png" },
-        });
-      },
-    },
-    "/api/scripts": {
-      POST: async (req) => {
-        const payload = await req.json();
-        const siteId = Number(payload.siteId ?? 0);
-        if (!siteId) {
-          return new Response(JSON.stringify({ error: "siteId required" }), {
-            status: 400,
-          });
-        }
-        const scriptText =
-          typeof payload.script === "string"
-            ? payload.script
-            : JSON.stringify(payload.script, null, 2);
-        try {
-          parseScript(scriptText);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          return new Response(JSON.stringify({ error: message }), { status: 400 });
-        }
-
-        await db
-          .insertInto("scripts")
-          .values({
-            site_id: siteId,
-            content: scriptText,
-            created_at: new Date().toISOString(),
-          })
-          .execute();
-
-        return new Response(JSON.stringify({ ok: true }), { status: 200 });
-      },
-    },
-    "/api/scripts/wait": {
-      GET: async (req) => {
-        const url = new URL(req.url);
-        const siteId = Number(url.searchParams.get("siteId") ?? 0);
-        const afterId = Number(url.searchParams.get("afterId") ?? 0);
-        if (!siteId) {
-          return new Response(JSON.stringify({ error: "siteId required" }), {
-            status: 400,
-          });
-        }
-
-        const timeoutMs = 25000;
-        const intervalMs = 1000;
-        const start = Date.now();
-
-        while (Date.now() - start < timeoutMs) {
-          const latest = await db
-            .selectFrom("scripts")
-            .selectAll()
-            .where("site_id", "=", siteId)
-            .orderBy("created_at", "desc")
-            .limit(1)
-            .executeTakeFirst();
-
-          if (latest && latest.id > afterId) {
-            return new Response(
-              JSON.stringify({
-                id: latest.id,
-                content: latest.content,
-                created_at: latest.created_at,
-              }),
-              { status: 200 },
-            );
-          }
-
-          await new Promise((resolve) => setTimeout(resolve, intervalMs));
-        }
-
-        return new Response(JSON.stringify({ ok: false }), { status: 200 });
-      },
-    },
-  },
+app.get("/", async (_req, res) => {
+  const sites = await listSites();
+  res.status(200).type("html").send(renderSiteList(sites));
 });
 
-console.log(`Garden server running on http://localhost:${PORT}`);
-const schedulerFlag = process.env.SCHEDULER_ENABLED?.toLowerCase();
-if (schedulerFlag !== "0" && schedulerFlag !== "false") {
-  startScheduler();
-}
+app.get("/sites/new", async (_req, res) => {
+  res.status(200).type("html").send(renderNewSite());
+});
 
-function htmlResponse(body: string, status = 200) {
-  return new Response(body, {
-    status,
-    headers: { "Content-Type": "text/html; charset=utf-8" },
+app.post("/sites", upload.none(), async (req, res) => {
+  const name = String(req.body.name ?? "").trim();
+  const domain = String(req.body.domain ?? "").trim();
+  if (!name || !domain) {
+    res
+      .status(400)
+      .type("html")
+      .send(layout("Error", `<section>Missing name or domain.</section>`));
+    return;
+  }
+  const existing = await getSiteIdByDomain(domain);
+  if (existing) {
+    res
+      .status(400)
+      .type("html")
+      .send(layout("Error", `<section>Domain already exists.</section>`));
+    return;
+  }
+  const now = new Date().toISOString();
+  const siteId = await insertSite({
+    name,
+    domain,
+    enabled: 1,
+    created_at: now,
+    updated_at: now,
+    last_run_at: null,
+    last_success_at: null,
+    last_status: null,
+    last_error: null,
+    username_enc: null,
+    password_enc: null,
   });
-}
 
-function redirect(path: string) {
-  return new Response(null, {
-    status: 303,
-    headers: { Location: path },
+  res.redirect(303, siteId ? `/sites/${encodeURIComponent(domain)}` : "/");
+});
+
+app.get("/sites/:domain", async (req, res) => {
+  const domainParam = String(req.params.domain ?? "").trim();
+  if (!domainParam) {
+    res
+      .status(404)
+      .type("html")
+      .send(layout("Not Found", `<section>Site not found.</section>`));
+    return;
+  }
+
+  const site = await getSiteByDomain(domainParam);
+
+  if (!site) {
+    const numericId = Number(domainParam);
+    if (Number.isFinite(numericId)) {
+      const fallback = await getSiteById(numericId);
+      if (fallback) {
+        res.redirect(303, `/sites/${encodeURIComponent(fallback.domain)}`);
+        return;
+      }
+    }
+    res
+      .status(404)
+      .type("html")
+      .send(layout("Not Found", `<section>Site not found.</section>`));
+    return;
+  }
+
+  const script = await getLatestScriptForSite(site.id);
+  const runs = await listRunsForSite(site.id, 10);
+  const runIds = runs.map((run) => run.id);
+  const screenshotsByRun: Record<number, { id: number; run_id: number; created_at: string }> =
+    {};
+
+  if (runIds.length > 0) {
+    const screenshots = await listScreenshotsForRuns(runIds);
+    for (const shot of screenshots) {
+      if (!screenshotsByRun[shot.run_id]) {
+        screenshotsByRun[shot.run_id] = shot;
+      }
+    }
+  }
+
+  res
+    .status(200)
+    .type("html")
+    .send(renderSiteDetail(site, script ?? null, runs, screenshotsByRun));
+});
+
+app.post("/sites/:domain/credentials", upload.none(), async (req, res) => {
+  const domainParam = String(req.params.domain ?? "").trim();
+  const username = String(req.body.username ?? "").trim();
+  const password = String(req.body.password ?? "").trim();
+
+  try {
+    const siteId = await getSiteIdByDomain(domainParam);
+    if (!siteId) {
+      res
+        .status(404)
+        .type("html")
+        .send(layout("Error", `<section>Site not found.</section>`));
+      return;
+    }
+    const values: {
+      username_enc?: string | null;
+      password_enc?: string | null;
+      updated_at: string;
+    } = { updated_at: new Date().toISOString() };
+
+    values.username_enc = username ? encryptSecret(username) : null;
+    values.password_enc = password ? encryptSecret(password) : null;
+
+    await updateSite(siteId, values);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res
+      .status(400)
+      .type("html")
+      .send(layout("Error", `<section>${message}</section>`));
+    return;
+  }
+
+  res.redirect(303, `/sites/${encodeURIComponent(domainParam)}`);
+});
+
+app.post("/sites/:domain/script", upload.none(), async (req, res) => {
+  const domainParam = String(req.params.domain ?? "").trim();
+  const siteId = await getSiteIdByDomain(domainParam);
+  if (!siteId) {
+    res
+      .status(404)
+      .type("html")
+      .send(layout("Error", `<section>Site not found.</section>`));
+    return;
+  }
+  const scriptText = String(req.body.script ?? "").trim();
+  if (!scriptText) {
+    res
+      .status(400)
+      .type("html")
+      .send(layout("Error", `<section>Script cannot be empty.</section>`));
+    return;
+  }
+  try {
+    parseScript(scriptText);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res
+      .status(400)
+      .type("html")
+      .send(layout("Error", `<section>${message}</section>`));
+    return;
+  }
+
+  await insertScript(siteId, scriptText, new Date().toISOString());
+
+  res.redirect(303, `/sites/${encodeURIComponent(domainParam)}`);
+});
+
+app.post("/sites/:domain/run", async (req, res) => {
+  const domainParam = String(req.params.domain ?? "").trim();
+  const siteId = await getSiteIdByDomain(domainParam);
+  if (!siteId) {
+    res
+      .status(404)
+      .type("html")
+      .send(layout("Error", `<section>Site not found.</section>`));
+    return;
+  }
+  runSite(siteId).catch((error) => {
+    console.error("Run failed", error);
   });
-}
+  res.redirect(303, `/sites/${encodeURIComponent(domainParam)}`);
+});
+
+app.post("/sites/:domain/delete", async (req, res) => {
+  const domainParam = String(req.params.domain ?? "").trim();
+  const siteId = await getSiteIdByDomain(domainParam);
+  if (!siteId) {
+    res
+      .status(404)
+      .type("html")
+      .send(layout("Not Found", `<section>Site not found.</section>`));
+    return;
+  }
+
+  const runIds = await listRunsBySite(siteId);
+  const ids = runIds.map((row) => row.id);
+
+  if (ids.length) {
+    await deleteScreenshotsByRunIds(ids);
+  }
+
+  await deleteRunsBySiteId(siteId);
+  await deleteScriptsBySiteId(siteId);
+  await deleteSitesById(siteId);
+
+  res.redirect(303, "/");
+});
+
+app.get("/runs/:id", async (req, res) => {
+  const runId = Number(req.params.id);
+  const run = await getRunById(runId);
+  if (!run) {
+    res
+      .status(404)
+      .type("html")
+      .send(layout("Not Found", `<section>Run not found.</section>`));
+    return;
+  }
+  const screenshot = await getLatestScreenshotForRun(runId);
+  const captchaTraces = await listCaptchaTracesForRun(runId);
+  const runEvents = await listRunEventsForRun(runId);
+  res
+    .status(200)
+    .type("html")
+    .send(renderRunDetail(run, screenshot ?? null, captchaTraces, runEvents));
+});
+
+app.get("/api/runs/:id/events", async (req, res) => {
+  const runId = Number(req.params.id);
+  if (!Number.isFinite(runId)) {
+    res.status(400).type("text").send("Run id required.");
+    return;
+  }
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.setHeader("X-Accel-Buffering", "no");
+  res.flushHeaders?.();
+  subscribeRunEvents(runId, res);
+});
+
+app.get("/screenshots/:id", async (req, res) => {
+  const shotId = Number(req.params.id);
+  const shot = await getScreenshotById(shotId);
+  if (!shot) {
+    res.status(404).type("text").send("Not found");
+    return;
+  }
+  res.status(200).type(shot.mime_type || "image/png").send(Buffer.from(shot.data));
+});
+
+app.post("/api/scripts", async (req, res) => {
+  const payload = req.body ?? {};
+  const siteId = Number(payload.siteId ?? 0);
+  if (!siteId) {
+    res.status(400).json({ error: "siteId required" });
+    return;
+  }
+  const scriptText =
+    typeof payload.script === "string"
+      ? payload.script
+      : JSON.stringify(payload.script, null, 2);
+  try {
+    parseScript(scriptText);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res.status(400).json({ error: message });
+    return;
+  }
+
+  await insertScript(siteId, scriptText, new Date().toISOString());
+
+  res.status(200).json({ ok: true });
+});
+
+app.get("/api/scripts/wait", async (req, res) => {
+  const siteId = Number(req.query.siteId ?? 0);
+  const afterId = Number(req.query.afterId ?? 0);
+  if (!siteId) {
+    res.status(400).json({ error: "siteId required" });
+    return;
+  }
+
+  const timeoutMs = 25000;
+  const intervalMs = 1000;
+  const start = Date.now();
+
+  while (Date.now() - start < timeoutMs) {
+    const latest = await getLatestScriptForSite(siteId);
+
+    if (latest && latest.id > afterId) {
+      res.status(200).json({
+        id: latest.id,
+        content: latest.content,
+        created_at: latest.created_at,
+      });
+      return;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, intervalMs));
+  }
+
+  res.status(200).json({ ok: false });
+});
+
+app.listen(PORT, () => {
+  console.log(`Garden server running on http://localhost:${PORT}`);
+  const schedulerFlag = process.env.SCHEDULER_ENABLED?.toLowerCase();
+  if (schedulerFlag !== "0" && schedulerFlag !== "false") {
+    startScheduler();
+  }
+});

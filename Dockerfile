@@ -1,26 +1,23 @@
-FROM ubuntu:22.04
+FROM node:22-bookworm
 
 ARG GIT_COMMIT_SHA=""
 ARG GIT_COMMIT_MESSAGE=""
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV BUN_INSTALL=/root/.bun
-ENV PATH=/root/.bun/bin:$PATH
 
 WORKDIR /app
 
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends curl ca-certificates unzip git \
-  && curl -fsSL https://bun.sh/install | bash \
+  && apt-get install -y --no-install-recommends git \
   && rm -rf /var/lib/apt/lists/*
 
-COPY package.json bun.lock ./
-RUN bun install --production
-RUN bunx playwright install --with-deps chromium
+COPY package.json ./
+RUN npm install --omit=dev
+RUN npx playwright install --with-deps chromium
 
 COPY . .
 
-RUN bun scripts/build-info.ts /app/build-info.json && rm -rf .git
+RUN node --import tsx scripts/build-info.ts /app/build-info.json && rm -rf .git
 
 ENV PORT=80
 ENV DATA_DIR=/config
@@ -34,4 +31,4 @@ RUN mkdir -p /config
 VOLUME ["/config"]
 EXPOSE 80
 
-CMD ["bun", "index.ts"]
+CMD ["node", "--import", "tsx", "index.ts"]

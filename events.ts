@@ -1,4 +1,5 @@
-import { db } from "./db";
+import type { Response } from "express";
+import { insertRunEvent } from "./db";
 
 type RunEvent = {
   type: string;
@@ -7,44 +8,35 @@ type RunEvent = {
 };
 
 type Client = {
-  controller: ReadableStreamDefaultController<Uint8Array>;
+  res: Response;
   keepalive: ReturnType<typeof setInterval>;
 };
 
-const encoder = new TextEncoder();
 const clientsByRun = new Map<number, Set<Client>>();
 
-export function subscribeRunEvents(runId: number) {
-  let currentController: ReadableStreamDefaultController<Uint8Array> | null = null;
-  return new ReadableStream<Uint8Array>({
-    start(controller) {
-      currentController = controller;
-      const client: Client = {
-        controller,
-        keepalive: setInterval(() => {
-          try {
-            controller.enqueue(encoder.encode(": ping\n\n"));
-          } catch {
-            // ignore; cleanup handled by cancel
-          }
-        }, 15000),
-      };
-
-      let clients = clientsByRun.get(runId);
-      if (!clients) {
-        clients = new Set();
-        clientsByRun.set(runId, clients);
+export function subscribeRunEvents(runId: number, res: Response) {
+  const client: Client = {
+    res,
+    keepalive: setInterval(() => {
+      try {
+        res.write(": ping\n\n");
+      } catch {
+        // ignore; cleanup handled by close
       }
-      clients.add(client);
+    }, 15000),
+  };
 
-      sendEvent(controller, { type: "ready", runId }, "ready");
-    },
-    cancel() {
-      if (currentController) {
-        removeClient(runId, currentController);
-        currentController = null;
-      }
-    },
+  let clients = clientsByRun.get(runId);
+  if (!clients) {
+    clients = new Set();
+    clientsByRun.set(runId, clients);
+  }
+  clients.add(client);
+
+  sendEvent(res, { type: "ready", runId }, "ready");
+
+  res.on("close", () => {
+    cleanupClient(runId, client);
   });
 }
 
@@ -63,28 +55,16 @@ export function emitRunEvent(runId: number, event: RunEvent) {
 }
 
 function sendEvent(
-  controller: ReadableStreamDefaultController<Uint8Array>,
+  res: Response,
   event: RunEvent,
   name: string,
 ) {
   try {
     const payload = `event: ${name}\ndata: ${JSON.stringify(event)}\n\n`;
-    controller.enqueue(encoder.encode(payload));
+    res.write(payload);
     return true;
   } catch {
     return false;
-  }
-}
-
-function removeClient(runId: number, controller: ReadableStreamDefaultController<Uint8Array>) {
-  const clients = clientsByRun.get(runId);
-  if (!clients) return;
-
-  for (const client of clients) {
-    if (client.controller === controller) {
-      cleanupClient(runId, client);
-      break;
-    }
   }
 }
 
@@ -100,15 +80,12 @@ function cleanupClient(runId: number, client: Client) {
 
 async function persistRunEvent(runId: number, event: RunEvent) {
   try {
-    await db
-      .insertInto("run_events")
-      .values({
-        run_id: runId,
-        type: event.type,
-        payload: JSON.stringify(event),
-        created_at: new Date().toISOString(),
-      })
-      .execute();
+    await insertRunEvent({
+      run_id: runId,
+      type: event.type,
+      payload: JSON.stringify(event),
+      created_at: new Date().toISOString(),
+    });
   } catch (error) {
     console.warn(
       `[events] failed to persist run event ${event.type} for ${runId}: ${

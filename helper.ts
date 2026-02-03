@@ -1,11 +1,13 @@
 import { createInterface } from "node:readline/promises";
+import { spawn } from "node:child_process";
+import { access, readFile, writeFile } from "node:fs/promises";
 import { processCodegen } from "./helper-lib";
 
 const USAGE = `garden helper
 
 Usage:
-  bun helper.ts record [url] [--upload-to <baseUrl>] [--site-id <id>]
-  bun helper.ts upload <script.json> --upload-to <baseUrl> --site-id <id>
+  node --import tsx helper.ts record [url] [--upload-to <baseUrl>] [--site-id <id>]
+  node --import tsx helper.ts upload <script.json> --upload-to <baseUrl> --site-id <id>
 
 Commands:
   record    Launch Playwright codegen, save script JSON, optionally upload.
@@ -52,19 +54,14 @@ async function recordCodegen(
 ) {
   const tmpDir = process.env.TMPDIR ?? "/tmp";
   const outputPath = `${tmpDir}/garden-codegen-${Date.now()}.js`;
-  const cmd = ["bunx", "playwright", "codegen", "--output", outputPath];
+  const cmd = ["npx", "playwright", "codegen", "--output", outputPath];
   if (url) cmd.push(url);
 
-  const proc = Bun.spawn({
-    cmd,
-    stdin: "inherit",
-    stdout: "inherit",
-    stderr: "inherit",
+  const proc = spawn(cmd[0]!, cmd.slice(1), { stdio: "inherit" });
+  const exitCode = await new Promise<number>((resolve) => {
+    proc.on("close", (code) => resolve(code ?? 1));
   });
-
-  const exitCode = await proc.exited;
-  const outputFile = Bun.file(outputPath);
-  const hasOutput = await outputFile.exists();
+  const hasOutput = await fileExists(outputPath);
   if (!hasOutput) {
     console.error(
       `No codegen output found at ${outputPath}. Exit code: ${exitCode}`,
@@ -73,7 +70,7 @@ async function recordCodegen(
     process.exit(exitCode || 1);
   }
 
-  const text = await outputFile.text();
+  const text = await readFile(outputPath, "utf8");
   if (!text.trim()) {
     console.error(`Codegen output was empty at ${outputPath}.`);
     console.error("Try closing the codegen window instead of Ctrl+C.");
@@ -93,12 +90,12 @@ async function recordCodegen(
     await uploadScript(uploadTo, siteId, recorded);
     console.log(`Uploaded script for site ${siteId} to ${uploadTo}.`);
     console.log(
-      `If you need to retry: bun helper.ts upload ${savedPath} --upload-to ${uploadTo} --site-id ${siteId}`,
+      `If you need to retry: node --import tsx helper.ts upload ${savedPath} --upload-to ${uploadTo} --site-id ${siteId}`,
     );
   } else {
     console.log(JSON.stringify(recorded, null, 2));
     console.log(
-      `To upload later: bun helper.ts upload ${savedPath} --upload-to <baseUrl> --site-id <id>`,
+      `To upload later: node --import tsx helper.ts upload ${savedPath} --upload-to <baseUrl> --site-id <id>`,
     );
   }
 }
@@ -199,11 +196,10 @@ async function uploadScript(
 }
 
 async function readScriptFile(path: string) {
-  const file = Bun.file(path);
-  if (!(await file.exists())) {
+  if (!(await fileExists(path))) {
     throw new Error(`Script file not found: ${path}`);
   }
-  const text = await file.text();
+  const text = await readFile(path, "utf8");
   const data = JSON.parse(text);
   if (!data || typeof data !== "object") {
     throw new Error(`Invalid script JSON in ${path}`);
@@ -214,21 +210,21 @@ async function readScriptFile(path: string) {
 async function writeScriptFile(script: object) {
   const tmpDir = process.env.TMPDIR ?? "/tmp";
   const path = `${tmpDir}/garden-script-${Date.now()}.json`;
-  await Bun.write(path, JSON.stringify(script, null, 2));
+  await writeFile(path, JSON.stringify(script, null, 2), "utf8");
   return path;
 }
 
 async function writePayloadFile(payload: string) {
   const tmpDir = process.env.TMPDIR ?? "/tmp";
   const path = `${tmpDir}/garden-upload-${Date.now()}.json`;
-  await Bun.write(path, payload);
+  await writeFile(path, payload, "utf8");
   return path;
 }
 
 async function uploadWithCurl(base: string, payloadPath: string) {
-  const proc = Bun.spawn({
-    cmd: [
-      "curl",
+  const proc = spawn(
+    "curl",
+    [
       "-sS",
       "-X",
       "POST",
@@ -238,13 +234,22 @@ async function uploadWithCurl(base: string, payloadPath: string) {
       `@${payloadPath}`,
       `${base}/api/scripts`,
     ],
-    stdin: "inherit",
-    stdout: "inherit",
-    stderr: "inherit",
+    { stdio: "inherit" },
+  );
+  const exitCode = await new Promise<number>((resolve) => {
+    proc.on("close", (code) => resolve(code ?? 1));
   });
-  const exitCode = await proc.exited;
   if (exitCode !== 0) {
     throw new Error(`curl upload failed with exit code ${exitCode}`);
+  }
+}
+
+async function fileExists(path: string) {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
   }
 }
 

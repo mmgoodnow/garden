@@ -1,4 +1,4 @@
-import { db } from "./db";
+import { listSites } from "./db";
 import { runSite } from "./runner";
 
 const DEFAULT_INTERVAL_MINUTES = 360;
@@ -23,10 +23,7 @@ export function startScheduler() {
     if (running) return;
     running = true;
     try {
-      const sites = await db
-        .selectFrom("sites")
-        .select(["id", "enabled", "last_run_at"])
-        .execute();
+      const sites = await listSites();
 
       const now = Date.now();
       for (const site of sites) {

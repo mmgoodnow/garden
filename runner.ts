@@ -1,5 +1,14 @@
 import { chromium, type Locator, type Page } from "playwright";
-import { db } from "./db";
+import {
+  getLatestRunId,
+  getLatestScriptForSite,
+  getSiteById,
+  insertCaptchaTrace,
+  insertRun,
+  insertScreenshot,
+  updateRun,
+  updateSite,
+} from "./db";
 import { emitRunEvent } from "./events";
 import { decryptSecret } from "./crypto";
 import { parseScript, type RecordedScript, type Step } from "./script";
@@ -33,23 +42,13 @@ function defaultScheme(domain: string) {
 }
 
 export async function runSite(siteId: number) {
-  const site = await db
-    .selectFrom("sites")
-    .selectAll()
-    .where("id", "=", siteId)
-    .executeTakeFirst();
+  const site = await getSiteById(siteId);
 
   if (!site) {
     throw new Error(`Site ${siteId} not found.`);
   }
 
-  const scriptRow = await db
-    .selectFrom("scripts")
-    .selectAll()
-    .where("site_id", "=", siteId)
-    .orderBy("created_at", "desc")
-    .limit(1)
-    .executeTakeFirst();
+  const scriptRow = await getLatestScriptForSite(siteId);
 
   if (!scriptRow) {
     throw new Error("No script uploaded for this site.");
@@ -58,27 +57,16 @@ export async function runSite(siteId: number) {
   const script = parseScript(scriptRow.content);
 
   const now = new Date().toISOString();
-  const runResult = await db
-    .insertInto("runs")
-    .values({
-      site_id: siteId,
-      status: "running",
-      started_at: now,
-      finished_at: null,
-      duration_ms: null,
-      error: null,
-    })
-    .executeTakeFirst();
-
-  let runId = Number(runResult.insertId ?? 0);
+  let runId = await insertRun({
+    site_id: siteId,
+    status: "running",
+    started_at: now,
+    finished_at: null,
+    duration_ms: null,
+    error: null,
+  });
   if (!runId) {
-    const fallback = await db
-      .selectFrom("runs")
-      .select("id")
-      .orderBy("id", "desc")
-      .limit(1)
-      .executeTakeFirst();
-    runId = Number(fallback?.id ?? 0);
+    runId = (await getLatestRunId()) ?? 0;
   }
   const startedAt = Date.now();
   console.log(`[runner] starting run ${runId} for site ${siteId}`);
@@ -95,27 +83,19 @@ export async function runSite(siteId: number) {
     await runScriptWithRetries(script, secrets, runId, baseUrl);
 
     const duration = Date.now() - startedAt;
-    await db
-      .updateTable("runs")
-      .set({
-        status: "success",
-        finished_at: new Date().toISOString(),
-        duration_ms: duration,
-      })
-      .where("id", "=", runId)
-      .execute();
+    await updateRun(runId, {
+      status: "success",
+      finished_at: new Date().toISOString(),
+      duration_ms: duration,
+    });
 
-    await db
-      .updateTable("sites")
-      .set({
-        last_run_at: new Date().toISOString(),
-        last_success_at: new Date().toISOString(),
-        last_status: "success",
-        last_error: null,
-        updated_at: new Date().toISOString(),
-      })
-      .where("id", "=", siteId)
-      .execute();
+    await updateSite(siteId, {
+      last_run_at: new Date().toISOString(),
+      last_success_at: new Date().toISOString(),
+      last_status: "success",
+      last_error: null,
+      updated_at: new Date().toISOString(),
+    });
     console.log(`[runner] run ${runId} success (${duration}ms)`);
     emitRunEvent(runId, {
       type: "run.success",
@@ -132,27 +112,19 @@ export async function runSite(siteId: number) {
       durationMs: duration,
       error: message,
     });
-    await db
-      .updateTable("runs")
-      .set({
-        status: "failed",
-        finished_at: new Date().toISOString(),
-        duration_ms: duration,
-        error: message,
-      })
-      .where("id", "=", runId)
-      .execute();
+    await updateRun(runId, {
+      status: "failed",
+      finished_at: new Date().toISOString(),
+      duration_ms: duration,
+      error: message,
+    });
 
-    await db
-      .updateTable("sites")
-      .set({
-        last_run_at: new Date().toISOString(),
-        last_status: "failed",
-        last_error: message,
-        updated_at: new Date().toISOString(),
-      })
-      .where("id", "=", siteId)
-      .execute();
+    await updateSite(siteId, {
+      last_run_at: new Date().toISOString(),
+      last_status: "failed",
+      last_error: message,
+      updated_at: new Date().toISOString(),
+    });
 
     throw error;
   }
@@ -863,19 +835,16 @@ async function recordCaptchaTrace(entry: {
 }) {
   if (!entry.run_id) return;
   try {
-    await db
-      .insertInto("captcha_traces")
-      .values({
-        run_id: entry.run_id,
-        attempt: entry.attempt,
-        sequence: entry.sequence,
-        model: entry.model,
-        prompt: entry.prompt,
-        response: entry.response,
-        error: entry.error,
-        created_at: new Date().toISOString(),
-      })
-      .execute();
+    await insertCaptchaTrace({
+      run_id: entry.run_id,
+      attempt: entry.attempt,
+      sequence: entry.sequence,
+      model: entry.model,
+      prompt: entry.prompt,
+      response: entry.response,
+      error: entry.error,
+      created_at: new Date().toISOString(),
+    });
   } catch (err) {
     console.warn(
       `[runner] failed to store captcha trace for run ${entry.run_id}: ${
@@ -889,13 +858,5 @@ async function captureScreenshot(runId: number, page: Page) {
   if (!runId) return;
   const data = await page.screenshot({ fullPage: true, type: "png" });
 
-  await db
-    .insertInto("screenshots")
-    .values({
-      run_id: runId,
-      data,
-      mime_type: "image/png",
-      created_at: new Date().toISOString(),
-    })
-    .execute();
+  await insertScreenshot(runId, data, "image/png", new Date().toISOString());
 }

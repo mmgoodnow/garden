@@ -1,4 +1,11 @@
-import { initDb, db } from "../db";
+import {
+  deleteAllData,
+  initDb,
+  insertRun,
+  insertScreenshot,
+  insertScript,
+  insertSite,
+} from "../db";
 import { encryptSecret } from "../crypto";
 
 type SiteInput = {
@@ -17,10 +24,7 @@ const args = process.argv.slice(2);
 const shouldReset = args.includes("--reset");
 
 if (shouldReset) {
-  await db.deleteFrom("screenshots").execute();
-  await db.deleteFrom("runs").execute();
-  await db.deleteFrom("scripts").execute();
-  await db.deleteFrom("sites").execute();
+  await deleteAllData();
 }
 
 const now = new Date().toISOString();
@@ -42,61 +46,41 @@ const sites: SiteInput[] = [
 ];
 
 for (const site of sites) {
-  const result = await db
-    .insertInto("sites")
-    .values({
-      name: site.name,
-      domain: site.domain,
-      enabled: 1,
-      created_at: now,
-      updated_at: now,
-      last_run_at: now,
-      last_success_at: site.status === "success" ? now : null,
-      last_status: site.status,
-      last_error: site.error,
-      username_enc: credentials.username_enc,
-      password_enc: credentials.password_enc,
-    })
-    .executeTakeFirst();
-
-  const siteId = Number(result.insertId ?? 0);
+  const siteId = await insertSite({
+    name: site.name,
+    domain: site.domain,
+    enabled: 1,
+    created_at: now,
+    updated_at: now,
+    last_run_at: now,
+    last_success_at: site.status === "success" ? now : null,
+    last_status: site.status,
+    last_error: site.error,
+    username_enc: credentials.username_enc,
+    password_enc: credentials.password_enc,
+  });
   if (!siteId) continue;
 
   const script = buildSampleScript(site.domain);
-  await db
-    .insertInto("scripts")
-    .values({
-      site_id: siteId,
-      content: JSON.stringify(script, null, 2),
-      created_at: now,
-    })
-    .execute();
+  await insertScript(siteId, JSON.stringify(script, null, 2), now);
 
-  const runResult = await db
-    .insertInto("runs")
-    .values({
-      site_id: siteId,
-      status: site.status,
-      error: site.error,
-      started_at: now,
-      finished_at: now,
-      duration_ms: 3200,
-    })
-    .executeTakeFirst();
-
-  const runId = Number(runResult.insertId ?? 0);
+  const runId = await insertRun({
+    site_id: siteId,
+    status: site.status,
+    error: site.error,
+    started_at: now,
+    finished_at: now,
+    duration_ms: 3200,
+  });
   if (!runId) continue;
 
   if (site.status === "success") {
-    await db
-      .insertInto("screenshots")
-      .values({
-        run_id: runId,
-        data: Buffer.from(SAMPLE_PNG_BASE64, "base64"),
-        mime_type: "image/png",
-        created_at: now,
-      })
-      .execute();
+    await insertScreenshot(
+      runId,
+      Buffer.from(SAMPLE_PNG_BASE64, "base64"),
+      "image/png",
+      now,
+    );
   }
 }
 
