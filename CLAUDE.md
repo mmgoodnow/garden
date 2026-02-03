@@ -4,10 +4,10 @@ globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
 alwaysApply: false
 ---
 
-Default to Node.js with type-stripping for running TypeScript directly.
+Default to Node.js with experimental transform-types for running TypeScript directly.
 
-- Use `node --experimental-strip-types <file>` to run TypeScript.
-- Use `node --test --experimental-strip-types` for tests.
+- Use `node --experimental-transform-types <file>` to run TypeScript.
+- Use `node --test --experimental-transform-types` for tests.
 - Use `npm install` for dependencies.
 
 ## APIs
@@ -18,7 +18,7 @@ Default to Node.js with type-stripping for running TypeScript directly.
 
 ## Testing
 
-Use `node --test --experimental-strip-types` to run tests.
+Use `node --test --experimental-transform-types` to run tests.
 
 ```ts#index.test.ts
 import test from "node:test";

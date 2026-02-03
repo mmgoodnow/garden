@@ -7,12 +7,12 @@
     "@types/node": "^22.13.5"
   },
   "scripts": {
-    "helper": "node --experimental-strip-types helper.ts",
-    "dev": "node --experimental-strip-types index.ts",
-    "mock:site": "node --experimental-strip-types testing/mock-site.ts",
-    "seed": "node --experimental-strip-types scripts/seed.ts",
-    "start": "node --experimental-strip-types index.ts",
-    "test": "node --test --experimental-strip-types"
+    "helper": "node --experimental-transform-types helper.ts",
+    "dev": "node --experimental-transform-types index.ts",
+    "mock:site": "node --experimental-transform-types testing/mock-site.ts",
+    "seed": "node --experimental-transform-types scripts/seed.ts",
+    "start": "node --experimental-transform-types index.ts",
+    "test": "node --test --experimental-transform-types"
   },
   "peerDependencies": {
     "typescript": "^5"

@@ -11,5 +11,5 @@ Requires Node 24 (use `fnm` with `.node-version`).
 To run:
 
 ```bash
-node --experimental-strip-types index.ts
+node --experimental-transform-types index.ts
 ```
