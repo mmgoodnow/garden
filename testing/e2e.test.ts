@@ -1,4 +1,5 @@
-import { test, expect } from "bun:test";
+import test from "node:test";
+import assert from "node:assert/strict";
 import {
   buildMockScript,
   createSite,
@@ -20,27 +21,27 @@ test(
         env.serverPort,
         env.dbPath,
       );
-      expect(res.status).toBe(303);
-      expect(Number.isFinite(siteId)).toBe(true);
+      assert.equal(res.status, 303);
+      assert.ok(Number.isFinite(siteId));
 
       const script = buildMockScript(env.mockPort);
       const scriptRes = await uploadScript(env.serverPort, siteId, script);
-      expect(scriptRes.status).toBe(200);
+      assert.equal(scriptRes.status, 200);
       const scriptBody = await scriptRes.json();
-      expect(scriptBody.ok).toBe(true);
+      assert.equal(scriptBody.ok, true);
 
       const credRes = await setCredentials(env.serverPort, siteDomain);
-      expect(credRes.status).toBe(303);
+      assert.equal(credRes.status, 303);
 
       const runRes = await triggerRun(env.serverPort, siteDomain);
-      expect(runRes.status).toBe(303);
+      assert.equal(runRes.status, 303);
 
       const run = await waitForRun(env.dbPath, siteId, 30000);
-      expect(run.status).toBe("success");
-      expect(run.error).toBeNull();
+      assert.equal(run.status, "success");
+      assert.equal(run.error, null);
 
       const shotSize = await waitForScreenshotSize(env.dbPath, run.id, 10000);
-      expect(shotSize).toBeGreaterThan(0);
+      assert.ok(shotSize > 0);
     } finally {
       stopTestEnv(env);
     }

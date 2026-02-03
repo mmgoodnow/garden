@@ -8,13 +8,13 @@ This project ships with a mock login site and a sample script for repeatable end
 
 ```bash
 export APP_ENC_KEY_BASE64="$(openssl rand -base64 32)"
-bun run dev
+npm run dev
 ```
 
 2) Start the mock login site in a second terminal:
 
 ```bash
-bun run mock:site
+npm run mock:site
 ```
 
 The mock site listens on `http://localhost:4001` with these default credentials:
@@ -23,14 +23,17 @@ The mock site listens on `http://localhost:4001` with these default credentials:
 
 ## Curl flow (create site -> upload script -> set creds -> run)
 
-1) Create a site (capture the new site id):
+1) Create a site (capture the site domain and id):
 
 ```bash
-SITE_ID=$(curl -i -s -X POST http://localhost:3000/sites \
+SITE_DOMAIN=$(curl -i -s -X POST http://localhost:3000/sites \
   -F "name=Mock Site" \
   -F "domain=localhost" \
   | awk -F'/' '/Location:/ {print $NF}' | tr -d '\r')
 
+SITE_ID=$(sqlite3 ./data/garden.db "select id from sites where domain='${SITE_DOMAIN}'")
+
+echo "SITE_DOMAIN=$SITE_DOMAIN"
 echo "SITE_ID=$SITE_ID"
 ```
 
@@ -52,7 +55,7 @@ curl -s -X POST http://localhost:3000/api/scripts \
 3) Set the credentials for the mock site:
 
 ```bash
-curl -i -s -X POST http://localhost:3000/sites/${SITE_ID}/credentials \
+curl -i -s -X POST http://localhost:3000/sites/${SITE_DOMAIN}/credentials \
   -F "username=test@example.com" \
   -F "password=password123"
 ```
@@ -60,16 +63,16 @@ curl -i -s -X POST http://localhost:3000/sites/${SITE_ID}/credentials \
 4) Kick off a run:
 
 ```bash
-curl -i -s -X POST http://localhost:3000/sites/${SITE_ID}/run
+curl -i -s -X POST http://localhost:3000/sites/${SITE_DOMAIN}/run
 ```
 
 5) Verify the result:
 
-- Visit `http://localhost:3000/sites/${SITE_ID}` to see run status and screenshots.
+- Visit `http://localhost:3000/sites/${SITE_DOMAIN}` to see run status and screenshots.
 - The screenshot is stored in the database (use the UI link to view it).
 
 ## Notes
 
 - If you change the mock site port or credentials, update `testing/mock-script.json` or the values you POST.
 - The mock site is intentionally minimal; add fields or flows there as runner capabilities grow.
-- The captcha solver test runs only when `OPENAI_API_KEY` is set (Bun loads `.env` automatically).
+- The captcha solver test runs only when `OPENAI_API_KEY` is set (Node does not load `.env` automatically).

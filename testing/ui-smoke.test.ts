@@ -1,4 +1,5 @@
-import { test, expect } from "bun:test";
+import test from "node:test";
+import assert from "node:assert/strict";
 import { chromium, type Page } from "playwright";
 import {
   buildMockScript,
@@ -39,7 +40,7 @@ test(
       await waitForRunSuccess(page, 30000);
 
       const viewLinks = page.getByRole("link", { name: "view" });
-      expect(await viewLinks.count()).toBeGreaterThan(0);
+      assert.ok((await viewLinks.count()) > 0);
     } finally {
       await browser.close();
       stopTestEnv(env);

@@ -8,9 +8,9 @@
 - [x] Auto-map secrets with fallback prompt
 - [x] Validate helper output against real login flow
 
-## Backend (Bun + SQLite)
+## Backend (Node + SQLite)
 - [x] Define SQLite schema (sites, runs, scripts, screenshots)
-- [x] Implement Kysely setup (init on startup)
+- [x] Implement SQLite access layer (init on startup)
 - [x] Add API routes to create/update sites and upload scripts
 - [x] Encrypt secrets at rest with env key
 - [ ] Add migrations strategy (versioned schema)

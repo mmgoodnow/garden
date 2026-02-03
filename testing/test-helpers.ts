@@ -5,9 +5,10 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
-import { Database } from "bun:sqlite";
+import { DatabaseSync } from "node:sqlite";
+import { spawn, type ChildProcess } from "node:child_process";
 
-export type Proc = ReturnType<typeof Bun.spawn>;
+export type Proc = ChildProcess;
 
 export const ROOT = fileURLToPath(new URL("..", import.meta.url));
 export const MOCK_USERNAME = "test@example.com";
@@ -32,8 +33,7 @@ export async function startTestEnv(): Promise<TestEnv> {
   const serverPort = await findFreePort();
   const mockPort = await findFreePort();
 
-  const serverProc = Bun.spawn({
-    cmd: ["bun", "index.ts"],
+  const serverProc = spawn("node", ["--import", "tsx", "index.ts"], {
     cwd: ROOT,
     env: {
       ...process.env,
@@ -42,24 +42,24 @@ export async function startTestEnv(): Promise<TestEnv> {
       DATA_DIR: dataDir,
       DB_PATH: dbPath,
       SCHEDULER_ENABLED: "0",
+      NODE_ENV: "test",
+      GARDEN_NO_PROMPT: "1",
     },
-    stdout: "pipe",
-    stderr: "pipe",
+    stdio: ["ignore", "pipe", "pipe"],
   });
   drain(serverProc.stdout);
   drain(serverProc.stderr);
 
-  const mockProc = Bun.spawn({
-    cmd: ["bun", "testing/mock-site.ts"],
+  const mockProc = spawn("node", ["--import", "tsx", "testing/mock-site.ts"], {
     cwd: ROOT,
     env: {
       ...process.env,
       MOCK_PORT: String(mockPort),
       MOCK_USERNAME,
       MOCK_PASSWORD,
+      NODE_ENV: "test",
     },
-    stdout: "pipe",
-    stderr: "pipe",
+    stdio: ["ignore", "pipe", "pipe"],
   });
   drain(mockProc.stdout);
   drain(mockProc.stderr);
@@ -145,10 +145,10 @@ export async function createSite(port: number, dbPath: string, domain = "localho
   });
   const location = res.headers.get("location");
   const siteDomain = decodeURIComponent(location?.split("/").pop() ?? domain);
-  const db = new Database(dbPath);
+  const db = new DatabaseSync(dbPath);
   try {
     const row = db
-      .query("select id from sites where domain = ?")
+      .prepare("select id from sites where domain = ?")
       .get(siteDomain) as { id: number } | undefined;
     const siteId = Number(row?.id ?? 0);
     return { res, siteId, location, siteDomain };
@@ -208,12 +208,12 @@ export async function triggerRunById(port: number, siteId: number) {
 }
 
 export async function waitForRun(dbPath: string, siteId: number, timeoutMs = 20000) {
-  const db = new Database(dbPath);
+  const db = new DatabaseSync(dbPath);
   try {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const row = db
-        .query(
+        .prepare(
           "select id, status, error from runs where site_id = ? order by id desc limit 1",
         )
         .get(siteId) as { id: number; status: string; error: string | null } | undefined;
@@ -233,12 +233,12 @@ export async function waitForScreenshotSize(
   runId: number,
   timeoutMs = 10000,
 ) {
-  const db = new Database(dbPath);
+  const db = new DatabaseSync(dbPath);
   try {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
       const row = db
-        .query(
+        .prepare(
           "select length(data) as size from screenshots where run_id = ? order by id desc limit 1",
         )
         .get(runId) as { size: number } | undefined;
@@ -269,9 +269,9 @@ export async function waitForOk(url: string, timeoutMs = 10000) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
-function drain(stream?: ReadableStream<Uint8Array> | null) {
+function drain(stream?: NodeJS.ReadableStream | null) {
   if (!stream) return;
-  stream.pipeTo(new WritableStream({ write() {} })).catch(() => undefined);
+  stream.resume();
 }
 
 async function findFreePort() {

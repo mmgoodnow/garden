@@ -4,23 +4,7 @@ const VALID_PASSWORD = process.env.MOCK_PASSWORD ?? "password123";
 const COOKIE_NAME = "mock_session";
 const COOKIE_VALUE = "ok";
 const CAPTCHA_POSTER_PATH = new URL("./captcha-poster.png", import.meta.url);
-
-function html(body: string, status = 200, headers: HeadersInit = {}) {
-  return new Response(`<!doctype html>${body}`, {
-    status,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      ...headers,
-    },
-  });
-}
-
-function redirect(location: string, headers: HeadersInit = {}) {
-  return new Response(null, {
-    status: 302,
-    headers: { Location: location, ...headers },
-  });
-}
+const CAPTCHA_POSTER_DATA = readFileSync(CAPTCHA_POSTER_PATH);
 
 function parseCookies(cookieHeader: string | null) {
   if (!cookieHeader) return {} as Record<string, string>;
@@ -32,8 +16,8 @@ function parseCookies(cookieHeader: string | null) {
   );
 }
 
-function isAuthenticated(req: Request) {
-  const cookies = parseCookies(req.headers.get("cookie"));
+function isAuthenticated(req: express.Request) {
+  const cookies = parseCookies(req.headers.cookie ?? null);
   return cookies[COOKIE_NAME] === COOKIE_VALUE;
 }
 
@@ -41,7 +25,7 @@ function loginPage(message = "") {
   const banner = message
     ? `<div data-testid="error" style="color:#b00020">${message}</div>`
     : "";
-  return html(`
+  return `
   <html lang="en">
     <head>
       <meta charset="utf-8" />
@@ -78,11 +62,11 @@ function loginPage(message = "") {
       </main>
     </body>
   </html>
-  `);
+  `;
 }
 
 function dashboardPage(username: string) {
-  return html(`
+  return `
   <html lang="en">
     <head>
       <meta charset="utf-8" />
@@ -97,7 +81,7 @@ function dashboardPage(username: string) {
       </main>
     </body>
   </html>
-  `);
+  `;
 }
 
 function captchaError(message = "") {
@@ -105,71 +89,76 @@ function captchaError(message = "") {
   return `<p data-testid="captcha-note" style="color:#1f7a5c">${message}</p>`;
 }
 
-Bun.serve({
-  port: PORT,
-  routes: {
-    "/": {
-      GET: async (req) => {
-        if (isAuthenticated(req)) {
-          return redirect("/dashboard");
-        }
-        return redirect("/login");
-      },
-    },
-    "/login": {
-      GET: async (req) => {
-        if (isAuthenticated(req)) {
-          return redirect("/dashboard");
-        }
-        return loginPage();
-      },
-      POST: async (req) => {
-        const form = await req.formData();
-        const username = String(form.get("username") ?? "").trim();
-        const password = String(form.get("password") ?? "").trim();
-        const movie = String(form.get("movie") ?? "");
-        if (
-          username === VALID_USERNAME &&
-          password === VALID_PASSWORD &&
-          movie === "nosferatu"
-        ) {
-          return redirect("/dashboard", {
-            "Set-Cookie": `${COOKIE_NAME}=${COOKIE_VALUE}; Path=/; HttpOnly; SameSite=Lax`,
-          });
-        }
-        return loginPage(
-          `Invalid credentials or captcha.${captchaError(
-            "Select the correct movie poster.",
-          )}`,
-        );
-      },
-    },
-    "/dashboard": {
-      GET: async (req) => {
-        if (!isAuthenticated(req)) {
-          return redirect("/login");
-        }
-        return dashboardPage(VALID_USERNAME);
-      },
-    },
-    "/logout": {
-      GET: async () => {
-        return redirect("/login", {
-          "Set-Cookie": [
-            `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`,
-          ].join(", "),
-        });
-      },
-    },
-    "/captcha-image": {
-      GET: async () => {
-        return new Response(Bun.file(CAPTCHA_POSTER_PATH), {
-          headers: { "Content-Type": "image/png" },
-        });
-      },
-    },
-  },
+const app = express();
+app.use(express.urlencoded({ extended: false }));
+
+app.get("/", (req, res) => {
+  if (isAuthenticated(req)) {
+    res.redirect(302, "/dashboard");
+    return;
+  }
+  res.redirect(302, "/login");
 });
 
-console.log(`Mock login site running on http://localhost:${PORT}`);
-console.log(`Valid credentials: ${VALID_USERNAME} / ${VALID_PASSWORD}`);
+app.get("/login", (req, res) => {
+  if (isAuthenticated(req)) {
+    res.redirect(302, "/dashboard");
+    return;
+  }
+  res.status(200).type("html").send(`<!doctype html>${loginPage()}`);
+});
+
+app.post("/login", (req, res) => {
+  const username = String(req.body.username ?? "").trim();
+  const password = String(req.body.password ?? "").trim();
+  const movie = String(req.body.movie ?? "");
+  if (
+    username === VALID_USERNAME &&
+    password === VALID_PASSWORD &&
+    movie === "nosferatu"
+  ) {
+    res.setHeader(
+      "Set-Cookie",
+      `${COOKIE_NAME}=${COOKIE_VALUE}; Path=/; HttpOnly; SameSite=Lax`,
+    );
+    res.redirect(302, "/dashboard");
+    return;
+  }
+  res
+    .status(200)
+    .type("html")
+    .send(
+      `<!doctype html>${loginPage(
+        `Invalid credentials or captcha.${captchaError(
+          "Select the correct movie poster.",
+        )}`,
+      )}`,
+    );
+});
+
+app.get("/dashboard", (req, res) => {
+  if (!isAuthenticated(req)) {
+    res.redirect(302, "/login");
+    return;
+  }
+  res.status(200).type("html").send(`<!doctype html>${dashboardPage(VALID_USERNAME)}`);
+});
+
+app.get("/logout", (_req, res) => {
+  res.setHeader(
+    "Set-Cookie",
+    `${COOKIE_NAME}=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax`,
+  );
+  res.redirect(302, "/login");
+});
+
+app.get("/captcha-image", (_req, res) => {
+  res.status(200).type("image/png").send(CAPTCHA_POSTER_DATA);
+});
+
+app.listen(PORT, () => {
+  console.log(`Mock login site running on http://localhost:${PORT}`);
+  console.log(`Valid credentials: ${VALID_USERNAME} / ${VALID_PASSWORD}`);
+});
+import express from "express";
+import { readFileSync } from "node:fs";
