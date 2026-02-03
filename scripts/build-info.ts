@@ -1,5 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 const outputPath = process.argv[2] ?? "build-info.json";
 
@@ -63,21 +64,15 @@ function readRef(gitDir: string, ref: string) {
 
 function readGitCommand() {
   try {
-    const shaResult = Bun.spawnSync({
-      cmd: ["git", "rev-parse", "HEAD"],
-      stdout: "pipe",
-      stderr: "pipe",
+    const shaResult = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" });
+    const msgResult = spawnSync("git", ["log", "-1", "--pretty=%s"], {
+      encoding: "utf8",
     });
-    const msgResult = Bun.spawnSync({
-      cmd: ["git", "log", "-1", "--pretty=%s"],
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    if (shaResult.exitCode !== 0 || msgResult.exitCode !== 0) {
+    if (shaResult.status !== 0 || msgResult.status !== 0) {
       return { sha: "", message: "" };
     }
-    const sha = new TextDecoder().decode(shaResult.stdout).trim();
-    const message = new TextDecoder().decode(msgResult.stdout).trim();
+    const sha = shaResult.stdout.trim();
+    const message = msgResult.stdout.trim();
     return { sha, message };
   } catch {
     return { sha: "", message: "" };

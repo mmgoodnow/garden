@@ -1,5 +1,6 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 
 export const DATA_DIR = process.env.DATA_DIR ?? "./data";
 export const DB_PATH = process.env.DB_PATH ?? join(DATA_DIR, "garden.db");
@@ -31,13 +32,9 @@ function getBuildInfo() {
 
 function readGit(...args: string[]) {
   try {
-    const result = Bun.spawnSync({
-      cmd: ["git", ...args],
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    if (result.exitCode !== 0) return null;
-    return new TextDecoder().decode(result.stdout).trim() || null;
+    const result = spawnSync("git", args, { encoding: "utf8" });
+    if (result.status !== 0) return null;
+    return result.stdout.trim() || null;
   } catch {
     return null;
   }
