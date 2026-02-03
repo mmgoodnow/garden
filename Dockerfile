@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright:v1.41.2-jammy
+FROM ubuntu:22.04
 
 ARG GIT_COMMIT_SHA=""
 ARG GIT_COMMIT_MESSAGE=""
@@ -16,6 +16,7 @@ RUN apt-get update \
 
 COPY package.json bun.lock ./
 RUN bun install --production
+RUN bunx playwright install --with-deps chromium
 
 COPY . .
 
