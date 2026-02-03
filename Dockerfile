@@ -1,4 +1,4 @@
-FROM node:22-bookworm
+FROM node:24-bookworm
 
 ARG GIT_COMMIT_SHA=""
 ARG GIT_COMMIT_MESSAGE=""
@@ -17,7 +17,7 @@ RUN npx playwright install --with-deps chromium
 
 COPY . .
 
-RUN node --import tsx scripts/build-info.ts /app/build-info.json && rm -rf .git
+RUN node --experimental-strip-types scripts/build-info.ts /app/build-info.json && rm -rf .git
 
 ENV PORT=80
 ENV DATA_DIR=/config
@@ -31,4 +31,4 @@ RUN mkdir -p /config
 VOLUME ["/config"]
 EXPOSE 80
 
-CMD ["node", "--import", "tsx", "index.ts"]
+CMD ["node", "--experimental-strip-types", "index.ts"]

@@ -593,7 +593,7 @@ export function renderSiteDetail(
         const origin = window.location.origin;
         const siteUrl = ${JSON.stringify(siteUrl)};
         const cmd =
-          "node --import tsx /Users/mmgoodnow/src/garden/helper.ts record " +
+          "node --experimental-strip-types /Users/mmgoodnow/src/garden/helper.ts record " +
           siteUrl +
           " --upload-to " +
           origin +

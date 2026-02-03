@@ -33,7 +33,7 @@ export async function startTestEnv(): Promise<TestEnv> {
   const serverPort = await findFreePort();
   const mockPort = await findFreePort();
 
-  const serverProc = spawn("node", ["--import", "tsx", "index.ts"], {
+  const serverProc = spawn("node", ["--experimental-strip-types", "index.ts"], {
     cwd: ROOT,
     env: {
       ...process.env,
@@ -50,7 +50,7 @@ export async function startTestEnv(): Promise<TestEnv> {
   drain(serverProc.stdout);
   drain(serverProc.stderr);
 
-  const mockProc = spawn("node", ["--import", "tsx", "testing/mock-site.ts"], {
+  const mockProc = spawn("node", ["--experimental-strip-types", "testing/mock-site.ts"], {
     cwd: ROOT,
     env: {
       ...process.env,

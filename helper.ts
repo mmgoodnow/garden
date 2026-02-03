@@ -6,8 +6,8 @@ import { processCodegen } from "./helper-lib";
 const USAGE = `garden helper
 
 Usage:
-  node --import tsx helper.ts record [url] [--upload-to <baseUrl>] [--site-id <id>]
-  node --import tsx helper.ts upload <script.json> --upload-to <baseUrl> --site-id <id>
+  node --experimental-strip-types helper.ts record [url] [--upload-to <baseUrl>] [--site-id <id>]
+  node --experimental-strip-types helper.ts upload <script.json> --upload-to <baseUrl> --site-id <id>
 
 Commands:
   record    Launch Playwright codegen, save script JSON, optionally upload.
@@ -90,12 +90,12 @@ async function recordCodegen(
     await uploadScript(uploadTo, siteId, recorded);
     console.log(`Uploaded script for site ${siteId} to ${uploadTo}.`);
     console.log(
-      `If you need to retry: node --import tsx helper.ts upload ${savedPath} --upload-to ${uploadTo} --site-id ${siteId}`,
+      `If you need to retry: node --experimental-strip-types helper.ts upload ${savedPath} --upload-to ${uploadTo} --site-id ${siteId}`,
     );
   } else {
     console.log(JSON.stringify(recorded, null, 2));
     console.log(
-      `To upload later: node --import tsx helper.ts upload ${savedPath} --upload-to <baseUrl> --site-id <id>`,
+      `To upload later: node --experimental-strip-types helper.ts upload ${savedPath} --upload-to <baseUrl> --site-id <id>`,
     );
   }
 }

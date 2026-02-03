@@ -1,13 +1,13 @@
 ---
-description: Use Node.js (with tsx) and Express for the server.
+description: Use Node.js (24+) and Express for the server.
 globs: "*.ts, *.tsx, *.html, *.css, *.js, *.jsx, package.json"
 alwaysApply: false
 ---
 
-Default to Node.js with `tsx` for running TypeScript directly.
+Default to Node.js with type-stripping for running TypeScript directly.
 
-- Use `node --import tsx <file>` or `tsx <file>` to run TypeScript.
-- Use `node --test --import tsx` for tests.
+- Use `node --experimental-strip-types <file>` to run TypeScript.
+- Use `node --test --experimental-strip-types` for tests.
 - Use `npm install` for dependencies.
 
 ## APIs
@@ -18,7 +18,7 @@ Default to Node.js with `tsx` for running TypeScript directly.
 
 ## Testing
 
-Use `node --test --import tsx` to run tests.
+Use `node --test --experimental-strip-types` to run tests.
 
 ```ts#index.test.ts
 import test from "node:test";

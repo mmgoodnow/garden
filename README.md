@@ -6,8 +6,10 @@ To install dependencies:
 npm install
 ```
 
+Requires Node 24 (use `fnm` with `.node-version`).
+
 To run:
 
 ```bash
-node --import tsx index.ts
+node --experimental-strip-types index.ts
 ```

@@ -7,12 +7,12 @@
     "@types/node": "^22.13.5"
   },
   "scripts": {
-    "helper": "node --import tsx helper.ts",
-    "dev": "tsx watch index.ts",
-    "mock:site": "node --import tsx testing/mock-site.ts",
-    "seed": "node --import tsx scripts/seed.ts",
-    "start": "node --import tsx index.ts",
-    "test": "node --test --import tsx"
+    "helper": "node --experimental-strip-types helper.ts",
+    "dev": "node --experimental-strip-types index.ts",
+    "mock:site": "node --experimental-strip-types testing/mock-site.ts",
+    "seed": "node --experimental-strip-types scripts/seed.ts",
+    "start": "node --experimental-strip-types index.ts",
+    "test": "node --test --experimental-strip-types"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -22,7 +22,6 @@
   "dependencies": {
     "express": "^4.21.2",
     "multer": "^1.4.5-lts.1",
-    "tsx": "^4.19.2",
     "playwright": "1.41.2"
   }
 }
