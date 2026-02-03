@@ -24,7 +24,7 @@ test(
       await page.locator('input[name="name"]').fill("Mock Site");
       await page.locator('input[name="domain"]').fill("localhost");
       await page.getByRole("button", { name: "Create" }).click();
-      await page.waitForURL(/\/sites\/[0-9]+$/);
+      await page.waitForURL(/\/sites\/.+$/);
 
       await page.locator('input[name="username"]').fill(MOCK_USERNAME);
       await page.locator('input[name="password"]').fill(MOCK_PASSWORD);

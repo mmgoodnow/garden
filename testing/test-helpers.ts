@@ -134,18 +134,27 @@ export function buildMockScript(mockPort: number) {
   };
 }
 
-export async function createSite(port: number) {
+export async function createSite(port: number, dbPath: string, domain = "localhost") {
   const form = new FormData();
   form.set("name", "Mock Site");
-  form.set("domain", "localhost");
+  form.set("domain", domain);
   const res = await fetch(`http://localhost:${port}/sites`, {
     method: "POST",
     body: form,
     redirect: "manual",
   });
   const location = res.headers.get("location");
-  const siteId = Number(location?.split("/").pop() ?? 0);
-  return { res, siteId, location };
+  const siteDomain = decodeURIComponent(location?.split("/").pop() ?? domain);
+  const db = new Database(dbPath);
+  try {
+    const row = db
+      .query("select id from sites where domain = ?")
+      .get(siteDomain) as { id: number } | undefined;
+    const siteId = Number(row?.id ?? 0);
+    return { res, siteId, location, siteDomain };
+  } finally {
+    db.close();
+  }
 }
 
 export async function uploadScript(port: number, siteId: number, script: object) {
@@ -156,7 +165,31 @@ export async function uploadScript(port: number, siteId: number, script: object)
   });
 }
 
-export async function setCredentials(port: number, siteId: number) {
+export async function setCredentials(port: number, siteDomain: string) {
+  const form = new FormData();
+  form.set("username", MOCK_USERNAME);
+  form.set("password", MOCK_PASSWORD);
+  return await fetch(
+    `http://localhost:${port}/sites/${encodeURIComponent(siteDomain)}/credentials`,
+    {
+      method: "POST",
+      body: form,
+      redirect: "manual",
+    },
+  );
+}
+
+export async function triggerRun(port: number, siteDomain: string) {
+  return await fetch(
+    `http://localhost:${port}/sites/${encodeURIComponent(siteDomain)}/run`,
+    {
+      method: "POST",
+      redirect: "manual",
+    },
+  );
+}
+
+export async function setCredentialsById(port: number, siteId: number) {
   const form = new FormData();
   form.set("username", MOCK_USERNAME);
   form.set("password", MOCK_PASSWORD);
@@ -167,7 +200,7 @@ export async function setCredentials(port: number, siteId: number) {
   });
 }
 
-export async function triggerRun(port: number, siteId: number) {
+export async function triggerRunById(port: number, siteId: number) {
   return await fetch(`http://localhost:${port}/sites/${siteId}/run`, {
     method: "POST",
     redirect: "manual",

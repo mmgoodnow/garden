@@ -392,7 +392,7 @@ export function renderSiteList(sites: SiteRow[]) {
   const rows = sites
     .map(
       (site) => `<tr>
-        <td><a href="/sites/${site.id}">${escapeHtml(site.name)}</a></td>
+        <td><a href="/sites/${encodeURIComponent(site.domain)}">${escapeHtml(site.name)}</a></td>
         <td>${escapeHtml(site.domain)}</td>
         <td>${site.enabled ? "Enabled" : "Disabled"}</td>
         <td>${renderStatus(site.last_status ?? "never")}</td>
@@ -482,10 +482,10 @@ export function renderSiteDetail(
         <h2>${escapeHtml(site.name)}</h2>
         <p class="muted">${escapeHtml(site.domain)}</p>
         <div class="actions">
-          <form method="post" action="/sites/${site.id}/run">
+          <form method="post" action="/sites/${encodeURIComponent(site.domain)}/run">
             <button type="submit">Run Now</button>
           </form>
-          <form method="post" action="/sites/${site.id}/delete" onsubmit="return confirm('Delete this site and all related data?');">
+          <form method="post" action="/sites/${encodeURIComponent(site.domain)}/delete" onsubmit="return confirm('Delete this site and all related data?');">
             <button type="submit" class="secondary">Delete Site</button>
           </form>
         </div>
@@ -500,7 +500,7 @@ export function renderSiteDetail(
               : `<div class="status-pill missing">Credentials needed</div>`
           }
         </div>
-        <form method="post" action="/sites/${site.id}/credentials">
+        <form method="post" action="/sites/${encodeURIComponent(site.domain)}/credentials">
           <label>Username</label>
           <input name="username" placeholder="user@example.com" />
           <label>Password</label>
@@ -539,7 +539,7 @@ export function renderSiteDetail(
       </section>
 
       <section class="site-script">
-      <form method="post" action="/sites/${site.id}/script">
+      <form method="post" action="/sites/${encodeURIComponent(site.domain)}/script">
         <div class="section-header">
           <h3>Script</h3>
           <div class="muted inline-actions">

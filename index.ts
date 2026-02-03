@@ -43,6 +43,17 @@ Bun.serve({
         if (!name || !domain) {
           return htmlResponse(layout("Error", `<section>Missing name or domain.</section>`), 400);
         }
+        const existing = await db
+          .selectFrom("sites")
+          .select("id")
+          .where("domain", "=", domain)
+          .executeTakeFirst();
+        if (existing) {
+          return htmlResponse(
+            layout("Error", `<section>Domain already exists.</section>`),
+            400,
+          );
+        }
         const now = new Date().toISOString();
         const result = await db
           .insertInto("sites")
@@ -62,30 +73,41 @@ Bun.serve({
           .executeTakeFirst();
 
         const siteId = Number(result.insertId ?? 0);
-        return redirect(siteId ? `/sites/${siteId}` : "/");
+        return redirect(siteId ? `/sites/${encodeURIComponent(domain)}` : "/");
       },
     },
-    "/sites/:id": {
+    "/sites/:domain": {
       GET: async (req) => {
-        const siteId = Number(req.params.id);
-        if (!Number.isFinite(siteId)) {
+        const domainParam = String(req.params.domain ?? "").trim();
+        if (!domainParam) {
           return htmlResponse(layout("Not Found", `<section>Site not found.</section>`), 404);
         }
 
         const site = await db
           .selectFrom("sites")
           .selectAll()
-          .where("id", "=", siteId)
+          .where("domain", "=", domainParam)
           .executeTakeFirst();
 
         if (!site) {
+          const numericId = Number(domainParam);
+          if (Number.isFinite(numericId)) {
+            const fallback = await db
+              .selectFrom("sites")
+              .select(["id", "domain"])
+              .where("id", "=", numericId)
+              .executeTakeFirst();
+            if (fallback) {
+              return redirect(`/sites/${encodeURIComponent(fallback.domain)}`);
+            }
+          }
           return htmlResponse(layout("Not Found", `<section>Site not found.</section>`), 404);
         }
 
         const script = await db
           .selectFrom("scripts")
           .selectAll()
-          .where("site_id", "=", siteId)
+          .where("site_id", "=", site.id)
           .orderBy("created_at", "desc")
           .limit(1)
           .executeTakeFirst();
@@ -93,7 +115,7 @@ Bun.serve({
         const runs = await db
           .selectFrom("runs")
           .selectAll()
-          .where("site_id", "=", siteId)
+          .where("site_id", "=", site.id)
           .orderBy("started_at", "desc")
           .limit(10)
           .execute();
@@ -121,14 +143,22 @@ Bun.serve({
         );
       },
     },
-    "/sites/:id/credentials": {
+    "/sites/:domain/credentials": {
       POST: async (req) => {
-        const siteId = Number(req.params.id);
+        const domainParam = String(req.params.domain ?? "").trim();
         const form = await req.formData();
         const username = String(form.get("username") ?? "").trim();
         const password = String(form.get("password") ?? "").trim();
 
         try {
+          const site = await db
+            .selectFrom("sites")
+            .select("id")
+            .where("domain", "=", domainParam)
+            .executeTakeFirst();
+          if (!site) {
+            return htmlResponse(layout("Error", `<section>Site not found.</section>`), 404);
+          }
           const values: {
             username_enc?: string | null;
             password_enc?: string | null;
@@ -138,18 +168,26 @@ Bun.serve({
           values.username_enc = username ? encryptSecret(username) : null;
           values.password_enc = password ? encryptSecret(password) : null;
 
-          await db.updateTable("sites").set(values).where("id", "=", siteId).execute();
+          await db.updateTable("sites").set(values).where("id", "=", site.id).execute();
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           return htmlResponse(layout("Error", `<section>${message}</section>`), 400);
         }
 
-        return redirect(`/sites/${siteId}`);
+        return redirect(`/sites/${encodeURIComponent(domainParam)}`);
       },
     },
-    "/sites/:id/script": {
+    "/sites/:domain/script": {
       POST: async (req) => {
-        const siteId = Number(req.params.id);
+        const domainParam = String(req.params.domain ?? "").trim();
+        const site = await db
+          .selectFrom("sites")
+          .select("id")
+          .where("domain", "=", domainParam)
+          .executeTakeFirst();
+        if (!site) {
+          return htmlResponse(layout("Error", `<section>Site not found.</section>`), 404);
+        }
         const form = await req.formData();
         const scriptText = String(form.get("script") ?? "").trim();
         if (!scriptText) {
@@ -165,35 +203,48 @@ Bun.serve({
         await db
           .insertInto("scripts")
           .values({
-            site_id: siteId,
+            site_id: site.id,
             content: scriptText,
             created_at: new Date().toISOString(),
           })
           .execute();
 
-        return redirect(`/sites/${siteId}`);
+        return redirect(`/sites/${encodeURIComponent(domainParam)}`);
       },
     },
-    "/sites/:id/run": {
+    "/sites/:domain/run": {
       POST: async (req) => {
-        const siteId = Number(req.params.id);
-        runSite(siteId).catch((error) => {
+        const domainParam = String(req.params.domain ?? "").trim();
+        const site = await db
+          .selectFrom("sites")
+          .select("id")
+          .where("domain", "=", domainParam)
+          .executeTakeFirst();
+        if (!site) {
+          return htmlResponse(layout("Error", `<section>Site not found.</section>`), 404);
+        }
+        runSite(site.id).catch((error) => {
           console.error("Run failed", error);
         });
-        return redirect(`/sites/${siteId}`);
+        return redirect(`/sites/${encodeURIComponent(domainParam)}`);
       },
     },
-    "/sites/:id/delete": {
+    "/sites/:domain/delete": {
       POST: async (req) => {
-        const siteId = Number(req.params.id);
-        if (!Number.isFinite(siteId)) {
+        const domainParam = String(req.params.domain ?? "").trim();
+        const site = await db
+          .selectFrom("sites")
+          .select("id")
+          .where("domain", "=", domainParam)
+          .executeTakeFirst();
+        if (!site) {
           return htmlResponse(layout("Not Found", `<section>Site not found.</section>`), 404);
         }
 
         const runIds = await db
           .selectFrom("runs")
           .select("id")
-          .where("site_id", "=", siteId)
+          .where("site_id", "=", site.id)
           .execute();
         const ids = runIds.map((row) => row.id);
 
@@ -201,9 +252,9 @@ Bun.serve({
           await db.deleteFrom("screenshots").where("run_id", "in", ids).execute();
         }
 
-        await db.deleteFrom("runs").where("site_id", "=", siteId).execute();
-        await db.deleteFrom("scripts").where("site_id", "=", siteId).execute();
-        await db.deleteFrom("sites").where("id", "=", siteId).execute();
+        await db.deleteFrom("runs").where("site_id", "=", site.id).execute();
+        await db.deleteFrom("scripts").where("site_id", "=", site.id).execute();
+        await db.deleteFrom("sites").where("id", "=", site.id).execute();
 
         return redirect("/");
       },

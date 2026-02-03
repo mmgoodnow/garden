@@ -29,7 +29,10 @@ await page.goto('http://localhost:${env.mockPort}/dashboard');
 `;
 
       const script = await processCodegen(codegen);
-      const { res, siteId } = await createSite(env.serverPort);
+      const { res, siteId, siteDomain } = await createSite(
+        env.serverPort,
+        env.dbPath,
+      );
       expect(res.status).toBe(303);
       expect(Number.isFinite(siteId)).toBe(true);
 
@@ -38,10 +41,10 @@ await page.goto('http://localhost:${env.mockPort}/dashboard');
       const scriptBody = await scriptRes.json();
       expect(scriptBody.ok).toBe(true);
 
-      const credRes = await setCredentials(env.serverPort, siteId);
+      const credRes = await setCredentials(env.serverPort, siteDomain);
       expect(credRes.status).toBe(303);
 
-      const runRes = await triggerRun(env.serverPort, siteId);
+      const runRes = await triggerRun(env.serverPort, siteDomain);
       expect(runRes.status).toBe(303);
 
       const run = await waitForRun(env.dbPath, siteId, 30000);
