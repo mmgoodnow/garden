@@ -6,6 +6,7 @@ export const DB_PATH = process.env.DB_PATH ?? join(DATA_DIR, "garden.db");
 export const PORT = Number.parseInt(process.env.PORT ?? "3000", 10);
 
 export const BUILD_INFO = getBuildInfo();
+export { getBuildInfo };
 
 function getBuildInfo() {
   const fileInfo = readBuildInfoFile();

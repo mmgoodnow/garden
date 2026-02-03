@@ -1,4 +1,4 @@
-import { BUILD_INFO } from "./config";
+import { BUILD_INFO, getBuildInfo } from "./config";
 import { escapeHtml } from "./util";
 
 type SiteRow = {
@@ -777,9 +777,10 @@ export function renderRunDetail(
 }
 
 function renderBuildInfo() {
-  if (!BUILD_INFO) return "";
-  const shortSha = BUILD_INFO.sha ? BUILD_INFO.sha.slice(0, 7) : "unknown";
-  const message = BUILD_INFO.message ? ` - ${escapeHtml(BUILD_INFO.message)}` : "";
+  const info = getBuildInfo() ?? BUILD_INFO;
+  if (!info) return "";
+  const shortSha = info.sha ? info.sha.slice(0, 7) : "unknown";
+  const message = info.message ? ` - ${escapeHtml(info.message)}` : "";
   const uptime = formatUptime(process.uptime());
   return `<div class="build-info">Commit: ${escapeHtml(shortSha)}${message} · Uptime: ${escapeHtml(uptime)}</div>`;
 }
