@@ -14,7 +14,7 @@ RUN apt-get update \
 COPY package.json bun.lock ./
 RUN bun install --production
 
-RUN npx playwright install --with-deps chromium chromium-headless-shell
+RUN npx playwright install --with-deps chromium
 
 COPY . .
 
