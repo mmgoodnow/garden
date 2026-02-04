@@ -208,8 +208,10 @@ app.post("/sites/:domain/script", upload.none(), async (req, res) => {
       .send(layout("Error", `<section>Script cannot be empty.</section>`));
     return;
   }
+  let normalizedScript = scriptText;
   try {
-    parseScript(scriptText);
+    normalizedScript = JSON.stringify(JSON.parse(scriptText), null, 2);
+    parseScript(normalizedScript);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     res
@@ -219,7 +221,7 @@ app.post("/sites/:domain/script", upload.none(), async (req, res) => {
     return;
   }
 
-  await insertScript(siteId, scriptText, new Date().toISOString());
+  await insertScript(siteId, normalizedScript, new Date().toISOString());
 
   res.redirect(303, `/sites/${encodeURIComponent(domainParam)}`);
 });
