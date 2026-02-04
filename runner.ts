@@ -356,8 +356,16 @@ function resolveLocator(page: Page, target: string): Locator {
     if (call.startsWith("getByRole(")) {
       const role = extractFirstStringLiteral(call);
       const name = extractNameOption(call);
+      const exact = extractExactOption(call);
+      const options: { name?: string; exact?: boolean } = {};
       if (name) {
-        return page.getByRole(role as never, { name });
+        options.name = name;
+      }
+      if (exact !== null) {
+        options.exact = exact;
+      }
+      if (Object.keys(options).length > 0) {
+        return page.getByRole(role as never, options);
       }
       return page.getByRole(role as never);
     }
@@ -398,6 +406,14 @@ function extractFirstStringLiteral(input: string): string | null {
 function extractNameOption(input: string): string | null {
   const match = input.match(/name:\s*(['"`])((?:\\.|(?!\1).)*)\1/);
   return match ? match[2] : null;
+}
+
+function extractExactOption(input: string): boolean | null {
+  const match = input.match(/exact:\s*(true|false)/);
+  if (!match) {
+    return null;
+  }
+  return match[1] === "true";
 }
 
 async function solveCaptcha(
