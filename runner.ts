@@ -452,8 +452,11 @@ async function solveCaptcha(
         container.setAttribute("data-garden-captcha", "1");
       }
     const images = Array.from(container.querySelectorAll("img"))
-      .map((img) => img.getAttribute("src"))
-      .filter((src): src is string => Boolean(src));
+      .map((img) => ({
+        originalSrc: img.getAttribute("src"),
+        fetchSrc: img.src,
+      }))
+      .filter((src) => Boolean(src.originalSrc ?? src.fetchSrc));
 
     return { html: container.outerHTML, imageSrcs: images };
     },
@@ -572,6 +575,11 @@ async function solveCaptcha(
   }
 }
 
+type CaptchaImageSource = {
+  originalSrc?: string | null;
+  fetchSrc?: string | null;
+};
+
 type ResolvedImage = {
   originalSrc: string;
   dataUrl: string;
@@ -580,17 +588,29 @@ type ResolvedImage = {
 
 async function resolveImageAssets(
   page: Page,
-  imageSrcs: string[],
+  imageSrcs: CaptchaImageSource[],
 ): Promise<ResolvedImage[]> {
-  const unique = Array.from(new Set(imageSrcs)).filter(Boolean);
+  const unique = Array.from(
+    new Map(
+      imageSrcs
+        .map((entry) => ({
+          originalSrc: entry.originalSrc ?? null,
+          fetchSrc: entry.fetchSrc ?? null,
+        }))
+        .filter((entry) => Boolean(entry.originalSrc ?? entry.fetchSrc))
+        .map((entry) => [entry.fetchSrc ?? entry.originalSrc ?? "", entry]),
+    ).values(),
+  );
   const resolved: ResolvedImage[] = [];
   const limit = 8;
 
   for (const [index, src] of unique.slice(0, limit).entries()) {
-    if (src.startsWith("data:")) {
+    const originalSrc = src.originalSrc ?? src.fetchSrc ?? "";
+    const fetchSrc = src.fetchSrc ?? src.originalSrc ?? "";
+    if (fetchSrc.startsWith("data:")) {
       resolved.push({
-        originalSrc: src,
-        dataUrl: src,
+        originalSrc,
+        dataUrl: fetchSrc,
         label: `image-${index + 1}`,
       });
       continue;
@@ -598,7 +618,7 @@ async function resolveImageAssets(
 
     let absolute: string;
     try {
-      absolute = new URL(src, page.url()).toString();
+      absolute = new URL(fetchSrc, page.url()).toString();
     } catch {
       continue;
     }
@@ -607,13 +627,16 @@ async function resolveImageAssets(
     if (!response.ok()) continue;
 
     const contentType = response.headers()["content-type"] ?? "image/png";
+    if (!contentType.startsWith("image/")) {
+      continue;
+    }
     const buffer = await response.body();
     const dataUrl = `data:${contentType};base64,${Buffer.from(buffer).toString(
       "base64",
     )}`;
 
     resolved.push({
-      originalSrc: src,
+      originalSrc,
       dataUrl,
       label: `image-${index + 1}`,
     });
