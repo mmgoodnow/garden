@@ -37,7 +37,7 @@ test(
       assert.equal(runRes.status, 303);
 
       const run = await waitForRun(env.dbPath, siteId, 30000);
-      assert.equal(run.status, "success");
+      assert.equal(run.status, "success", run.error ?? "run failed");
       assert.equal(run.error, null);
 
       const shotSize = await waitForScreenshotSize(env.dbPath, run.id, 10000);
