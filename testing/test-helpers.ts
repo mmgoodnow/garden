@@ -220,13 +220,19 @@ export async function waitForRun(dbPath: string, siteId: number, timeoutMs = 200
   try {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      const row = db
-        .prepare(
-          "select id, status, error from runs where site_id = ? order by id desc limit 1",
-        )
-        .get(siteId) as { id: number; status: string; error: string | null } | undefined;
-      if (row && row.status !== "running") {
-        return row;
+      try {
+        const row = db
+          .prepare(
+            "select id, status, error from runs where site_id = ? order by id desc limit 1",
+          )
+          .get(siteId) as { id: number; status: string; error: string | null } | undefined;
+        if (row && row.status !== "running") {
+          return row;
+        }
+      } catch (error) {
+        if (!(error instanceof Error) || !isLockedError(error)) {
+          throw error;
+        }
       }
       await delay(250);
     }
@@ -245,13 +251,19 @@ export async function waitForScreenshotSize(
   try {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      const row = db
-        .prepare(
-          "select length(data) as size from screenshots where run_id = ? order by id desc limit 1",
-        )
-        .get(runId) as { size: number } | undefined;
-      if (row?.size) {
-        return row.size;
+      try {
+        const row = db
+          .prepare(
+            "select length(data) as size from screenshots where run_id = ? order by id desc limit 1",
+          )
+          .get(runId) as { size: number } | undefined;
+        if (row?.size) {
+          return row.size;
+        }
+      } catch (error) {
+        if (!(error instanceof Error) || !isLockedError(error)) {
+          throw error;
+        }
       }
       await delay(250);
     }
@@ -293,6 +305,10 @@ function drain(stream?: NodeJS.ReadableStream | null, logs: string[] = []) {
     logs.push(String(chunk));
   });
   stream.resume();
+}
+
+function isLockedError(error: Error) {
+  return error.message.toLowerCase().includes("locked");
 }
 
 async function findFreePort() {
