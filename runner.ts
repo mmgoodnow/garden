@@ -171,12 +171,12 @@ async function runScript(
       }
     }
 
-    await captureScreenshot(runId, page);
+    await captureFinalScreenshot(runId, page);
     screenshotCaptured = true;
   } finally {
     if (!screenshotCaptured) {
       try {
-        await captureScreenshot(runId, page);
+        await captureFinalScreenshot(runId, page);
       } catch {
         // best-effort screenshot on failure
       }
@@ -901,6 +901,25 @@ async function recordCaptchaTrace(entry: {
       }`,
     );
   }
+}
+
+async function captureFinalScreenshot(runId: number, page: Page) {
+  await waitForFinalScreenshot(page);
+  await captureScreenshot(runId, page);
+}
+
+async function waitForFinalScreenshot(page: Page) {
+  try {
+    await page.waitForLoadState("domcontentloaded", { timeout: 5000 });
+  } catch {
+    // ignore
+  }
+  try {
+    await page.waitForLoadState("networkidle", { timeout: 5000 });
+  } catch {
+    // ignore
+  }
+  await page.waitForTimeout(500);
 }
 
 async function captureScreenshot(runId: number, page: Page) {
