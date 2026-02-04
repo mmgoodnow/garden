@@ -6,7 +6,7 @@ import {
   startTestEnv,
   stopTestEnv,
   uploadScript,
-} from "./test-helpers";
+} from "./test-helpers.ts";
 
 test(
   "scripts wait endpoint returns latest script after upload",

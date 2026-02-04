@@ -7,7 +7,7 @@ import {
   MOCK_USERNAME,
   startTestEnv,
   stopTestEnv,
-} from "./test-helpers";
+} from "./test-helpers.ts";
 
 const TIMEOUT_MS = 60000;
 

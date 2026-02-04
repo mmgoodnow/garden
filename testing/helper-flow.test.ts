@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { processCodegen } from "../helper-lib";
+import { processCodegen } from "../helper-lib.ts";
 import {
   createSite,
   setCredentials,
@@ -10,7 +10,7 @@ import {
   uploadScript,
   waitForRun,
   waitForScreenshotSize,
-} from "./test-helpers";
+} from "./test-helpers.ts";
 
 const TIMEOUT_MS = 60000;
 

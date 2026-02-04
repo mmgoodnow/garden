@@ -10,7 +10,7 @@ import {
   uploadScript,
   waitForRun,
   waitForScreenshotSize,
-} from "./test-helpers";
+} from "./test-helpers.ts";
 
 test(
   "runner end-to-end flow (mock site + curl-style API calls)",
