@@ -463,6 +463,7 @@ export function renderSiteDetail(
   script: ScriptRow | null,
   runs: RunRow[],
   screenshotsByRun: Record<number, ScreenshotRow | undefined>,
+  nextRunAt: string | null,
 ) {
   const scriptId = script?.id ?? 0;
   const scriptContent = script ? escapeHtml(script.content) : "";
@@ -533,6 +534,10 @@ export function renderSiteDetail(
           <div class="last-run-item">
             <span>Last success</span>
             <strong>${formatTimestamp(site.last_success_at)}</strong>
+          </div>
+          <div class="last-run-item">
+            <span>Next run</span>
+            <strong>${formatTimestamp(nextRunAt)}</strong>
           </div>
           <div class="last-run-item">
             <span>Last error</span>

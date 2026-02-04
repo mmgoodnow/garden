@@ -148,10 +148,28 @@ app.get("/sites/:domain", async (req, res) => {
     }
   }
 
+  const scheduleDays = Number.parseInt(
+    process.env.SCHEDULE_EVERY_DAYS ?? "30",
+    10,
+  );
+  const scheduleWindowDays = Math.max(scheduleDays, 1);
+  const lastRunAt = site.last_run_at ? Date.parse(site.last_run_at) : NaN;
+  const nextRunAt = Number.isNaN(lastRunAt)
+    ? new Date().toISOString()
+    : new Date(lastRunAt + scheduleWindowDays * 24 * 60 * 60 * 1000).toISOString();
+
   res
     .status(200)
     .type("html")
-    .send(renderSiteDetail(site, script ?? null, runs, screenshotsByRun));
+    .send(
+      renderSiteDetail(
+        site,
+        script ?? null,
+        runs,
+        screenshotsByRun,
+        nextRunAt,
+      ),
+    );
 });
 
 app.post("/sites/:domain/credentials", upload.none(), async (req, res) => {
