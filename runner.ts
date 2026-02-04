@@ -472,11 +472,16 @@ async function solveCaptcha(
 
   let modelSteps: CaptchaModelStep[];
   let responseText = "";
+  const sampleSteps = redactSecretsInText(
+    JSON.stringify(step.steps, null, 2),
+    secrets,
+  );
   const request = buildCaptchaRequest(
     page.url(),
     htmlWithMarkers,
     imageInputs,
     imageMap,
+    sampleSteps,
     previousError,
     secrets,
   );
@@ -680,6 +685,7 @@ function buildCaptchaRequest(
   html: string,
   imageInputs: Array<{ type: "input_image"; image_url: string }>,
   imageMap: string,
+  sampleSteps: string,
   previousError: unknown,
   secrets: SecretValues,
 ) {
@@ -692,6 +698,9 @@ function buildCaptchaRequest(
     "Do NOT click any submit/sign-in/continue buttons; the caller will submit the form.",
     "Pick the option that best matches the poster/image.",
     "Only include the actions required to solve the captcha and proceed.",
+    "Allowed actions: click, check, fill, type, press, selectOption.",
+    "Do NOT use open, extractAttribute, or goto.",
+    "If the captcha is a text input, fill/type the answer into the input.",
   ].join(" ");
 
   const errorTextRaw =
@@ -710,6 +719,8 @@ function buildCaptchaRequest(
     "",
     imageMap ? "Image map:" : "No images found in fragment.",
     imageMap || "",
+    "Recorded helper steps (example):",
+    sampleSteps,
     errorText ? `Previous attempt error: ${errorText}` : "",
   ]
     .filter(Boolean)
@@ -822,12 +833,26 @@ function extractOutputText(payload: unknown): string {
 }
 
 function normalizeCaptchaStep(step: CaptchaModelStep, containerSelector: string): Step {
+  const allowedTypes = new Set([
+    "click",
+    "check",
+    "fill",
+    "type",
+    "press",
+    "selectOption",
+  ]);
+
   if (step.type === "captcha") {
     throw new Error("Captcha solver returned nested captcha step.");
   }
 
   if (step.type === "goto") {
     throw new Error("Captcha solver returned disallowed goto step.");
+  }
+  if (!allowedTypes.has(step.type)) {
+    throw new Error(
+      `Captcha solver returned disallowed step type: ${step.type}.`,
+    );
   }
 
   const locator = step.locator ?? step.selector;

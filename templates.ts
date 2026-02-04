@@ -138,6 +138,17 @@ export function layout(title: string, body: string) {
         margin-right: 12px;
         font-weight: 600;
       }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
       section {
         background: var(--panel);
         border: 1px solid var(--border);
@@ -681,6 +692,23 @@ export function renderRunDetail(
       </details>`;
     })
     .join("");
+  const traceText = traces
+    .map((trace) => {
+      const parts = [
+        `${trace.error ? "FAIL" : "OK"} Attempt ${trace.attempt} · Step ${trace.sequence} · ${trace.model}`,
+        "",
+        "Prompt:",
+        trace.prompt ?? "-",
+        "",
+        "Response:",
+        trace.response ?? "-",
+      ];
+      if (trace.error) {
+        parts.push("", "Error:", trace.error);
+      }
+      return parts.join("\n");
+    })
+    .join("\n\n---\n\n");
 
   const history = events
     .map((event) => formatRunEvent(event.payload))
@@ -705,7 +733,11 @@ export function renderRunDetail(
       <pre id="live-log" class="live-log">${escapeHtml(history)}</pre>
     </section>
     <section>
-      <h3>Captcha trace</h3>
+      <div class="section-header">
+        <h3>Captcha trace</h3>
+        <button type="button" class="secondary" id="copy-captcha-trace">Copy</button>
+      </div>
+      <textarea id="captcha-trace-text" class="sr-only" readonly>${escapeHtml(traceText)}</textarea>
       ${
         traceItems ||
         `<p class="muted">No captcha trace recorded for this run.</p>`
@@ -716,6 +748,25 @@ export function renderRunDetail(
       (() => {
         const logEl = document.getElementById("live-log");
         const statusEl = document.getElementById("live-status");
+        const copyBtn = document.getElementById("copy-captcha-trace");
+        const traceEl = document.getElementById("captcha-trace-text");
+        if (copyBtn && traceEl && "clipboard" in navigator) {
+          copyBtn.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(traceEl.value);
+              copyBtn.textContent = "Copied";
+              setTimeout(() => {
+                copyBtn.textContent = "Copy";
+              }, 1200);
+            } catch {
+              copyBtn.textContent = "Copy failed";
+              setTimeout(() => {
+                copyBtn.textContent = "Copy";
+              }, 1200);
+            }
+          });
+        }
+
         if (!logEl || !statusEl || typeof EventSource === "undefined") return;
 
         const source = new EventSource("/api/runs/${run.id}/events");
