@@ -76,7 +76,7 @@ async function recordCodegen(
 
   if (exitCode !== 0) {
     console.error(
-      `Warning: codegen exited with ${exitCode}, but output was captured.`,
+      `Note: codegen exited with ${exitCode}, but output was captured.`,
     );
   }
 
@@ -84,8 +84,9 @@ async function recordCodegen(
   const savedPath = await writeScriptFile(recorded);
   console.log(`Saved script to ${savedPath}.`);
   if (uploadTo && siteId) {
+    console.log("Uploading script...");
     await uploadScript(uploadTo, siteId, recorded);
-    console.log(`Uploaded script for site ${siteId} to ${uploadTo}.`);
+    console.log(`Upload complete for site ${siteId}.`);
     console.log(
       `If you need to retry: node --experimental-transform-types index.ts helper upload ${savedPath} --upload-to ${uploadTo} --site-id ${siteId}`,
     );
@@ -183,7 +184,6 @@ async function uploadScript(
     if (!(error instanceof Error) || !shouldOfferCurl(error)) {
       throw error;
     }
-    console.log("Fetch failed; falling back to curl.");
     const payloadPath = await writePayloadFile(payload);
     await uploadWithCurl(base, payloadPath);
   }
