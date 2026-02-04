@@ -1,5 +1,7 @@
 # dependencies (bun install)
 node_modules
+.DS_Store
+playwright@latest
 
 # output
 out
