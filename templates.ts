@@ -315,6 +315,8 @@ export function layout(title: string, body: string) {
       .run-preview img {
         width: 100%;
         max-width: 100%;
+        max-height: 220px;
+        object-fit: cover;
         border-radius: 10px;
         border: 1px solid var(--border);
       }
