@@ -12,7 +12,10 @@ import {
   waitForScreenshotSize,
 } from "./test-helpers.ts";
 
-test(
+const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+const runTest = hasOpenAI ? test : test.skip;
+
+runTest(
   "runner end-to-end flow (mock site + curl-style API calls)",
   async () => {
     const env = await startTestEnv();

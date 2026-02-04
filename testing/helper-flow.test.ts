@@ -14,7 +14,10 @@ import {
 
 const TIMEOUT_MS = 60000;
 
-test(
+const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
+const runTest = hasOpenAI ? test : test.skip;
+
+runTest(
   "helper output runs against mock login flow",
   async () => {
     const env = await startTestEnv();
