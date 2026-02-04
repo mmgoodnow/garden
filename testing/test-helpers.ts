@@ -23,6 +23,8 @@ export type TestEnv = {
   mockPort: number;
   serverProc?: Proc;
   mockProc?: Proc;
+  serverLogs?: string[];
+  mockLogs?: string[];
 };
 
 export async function startTestEnv(): Promise<TestEnv> {
@@ -33,7 +35,11 @@ export async function startTestEnv(): Promise<TestEnv> {
   const serverPort = await findFreePort();
   const mockPort = await findFreePort();
 
-  const serverProc = spawn("node", ["--experimental-transform-types", "index.ts"], {
+  const serverLogs: string[] = [];
+  const mockLogs: string[] = [];
+  const nodePath = process.execPath;
+
+  const serverProc = spawn(nodePath, ["--experimental-transform-types", "index.ts"], {
     cwd: ROOT,
     env: {
       ...process.env,
@@ -47,10 +53,10 @@ export async function startTestEnv(): Promise<TestEnv> {
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  drain(serverProc.stdout);
-  drain(serverProc.stderr);
+  drain(serverProc.stdout, serverLogs);
+  drain(serverProc.stderr, serverLogs);
 
-  const mockProc = spawn("node", ["--experimental-transform-types", "testing/mock-site.ts"], {
+  const mockProc = spawn(nodePath, ["--experimental-transform-types", "testing/mock-site.ts"], {
     cwd: ROOT,
     env: {
       ...process.env,
@@ -61,11 +67,11 @@ export async function startTestEnv(): Promise<TestEnv> {
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
-  drain(mockProc.stdout);
-  drain(mockProc.stderr);
+  drain(mockProc.stdout, mockLogs);
+  drain(mockProc.stderr, mockLogs);
 
-  await waitForOk(`http://localhost:${serverPort}/`);
-  await waitForOk(`http://localhost:${mockPort}/login`);
+  await waitForOk(`http://localhost:${serverPort}/`, serverProc, serverLogs);
+  await waitForOk(`http://localhost:${mockPort}/login`, mockProc, mockLogs);
 
   return {
     appKey,
@@ -76,6 +82,8 @@ export async function startTestEnv(): Promise<TestEnv> {
     mockPort,
     serverProc,
     mockProc,
+    serverLogs,
+    mockLogs,
   };
 }
 
@@ -253,9 +261,18 @@ export async function waitForScreenshotSize(
   throw new Error("Timed out waiting for screenshot");
 }
 
-export async function waitForOk(url: string, timeoutMs = 10000) {
+export async function waitForOk(
+  url: string,
+  proc?: Proc,
+  logs?: string[],
+  timeoutMs = 10000,
+) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
+    if (proc?.exitCode != null) {
+      const output = logs?.join("") ?? "";
+      throw new Error(`Process exited before ready: ${output || "no logs"}`);
+    }
     try {
       const res = await fetch(url, { redirect: "manual" });
       if (res.ok || res.status === 302 || res.status === 303) {
@@ -266,11 +283,15 @@ export async function waitForOk(url: string, timeoutMs = 10000) {
     }
     await delay(200);
   }
-  throw new Error(`Timed out waiting for ${url}`);
+  const output = logs?.join("") ?? "";
+  throw new Error(`Timed out waiting for ${url}${output ? `\nLogs:\n${output}` : ""}`);
 }
 
-function drain(stream?: NodeJS.ReadableStream | null) {
+function drain(stream?: NodeJS.ReadableStream | null, logs: string[] = []) {
   if (!stream) return;
+  stream.on("data", (chunk) => {
+    logs.push(String(chunk));
+  });
   stream.resume();
 }
 
