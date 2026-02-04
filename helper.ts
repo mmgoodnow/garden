@@ -6,46 +6,43 @@ import { processCodegen } from "./helper-lib.ts";
 const USAGE = `garden helper
 
 Usage:
-  node --experimental-transform-types helper.ts record [url] [--upload-to <baseUrl>] [--site-id <id>]
-  node --experimental-transform-types helper.ts upload <script.json> --upload-to <baseUrl> --site-id <id>
+  node --experimental-transform-types index.ts helper record [url] [--upload-to <baseUrl>] [--site-id <id>]
+  node --experimental-transform-types index.ts helper upload <script.json> --upload-to <baseUrl> --site-id <id>
 
 Commands:
   record    Launch Playwright codegen, save script JSON, optionally upload.
   upload    Upload a saved script JSON file.
 `;
 
-const args = process.argv.slice(2);
-const command = args[0];
+export async function runHelper(rawArgs: string[] = []) {
+  const command = rawArgs[0];
 
-if (!command || command === "help" || command === "--help") {
-  console.log(USAGE);
-  process.exit(0);
-}
-
-if (command === "record") {
-  const recordArgs = parseRecordArgs(args.slice(1));
-  await recordCodegen(
-    recordArgs.url,
-    recordArgs.uploadTo,
-    recordArgs.siteId,
-  );
-  process.exit(0);
-}
-
-if (command === "upload") {
-  const uploadArgs = parseUploadArgs(args.slice(1));
-  if (!uploadArgs.path || !uploadArgs.uploadTo || !uploadArgs.siteId) {
-    console.error(`Missing required args.\n\n${USAGE}`);
-    process.exit(1);
+  if (!command || command === "help" || command === "--help") {
+    console.log(USAGE);
+    return 0;
   }
-  const script = await readScriptFile(uploadArgs.path);
-  await uploadScript(uploadArgs.uploadTo, uploadArgs.siteId, script);
-  console.log(`Uploaded script for site ${uploadArgs.siteId} to ${uploadArgs.uploadTo}.`);
-  process.exit(0);
-}
 
-console.error(`Unknown command: ${command}\n\n${USAGE}`);
-process.exit(1);
+  if (command === "record") {
+    const recordArgs = parseRecordArgs(rawArgs.slice(1));
+    await recordCodegen(recordArgs.url, recordArgs.uploadTo, recordArgs.siteId);
+    return 0;
+  }
+
+  if (command === "upload") {
+    const uploadArgs = parseUploadArgs(rawArgs.slice(1));
+    if (!uploadArgs.path || !uploadArgs.uploadTo || !uploadArgs.siteId) {
+      console.error(`Missing required args.\n\n${USAGE}`);
+      return 1;
+    }
+    const script = await readScriptFile(uploadArgs.path);
+    await uploadScript(uploadArgs.uploadTo, uploadArgs.siteId, script);
+    console.log(`Uploaded script for site ${uploadArgs.siteId} to ${uploadArgs.uploadTo}.`);
+    return 0;
+  }
+
+  console.error(`Unknown command: ${command}\n\n${USAGE}`);
+  return 1;
+}
 
 async function recordCodegen(
   url?: string,
@@ -90,12 +87,12 @@ async function recordCodegen(
     await uploadScript(uploadTo, siteId, recorded);
     console.log(`Uploaded script for site ${siteId} to ${uploadTo}.`);
     console.log(
-      `If you need to retry: node --experimental-transform-types helper.ts upload ${savedPath} --upload-to ${uploadTo} --site-id ${siteId}`,
+      `If you need to retry: node --experimental-transform-types index.ts helper upload ${savedPath} --upload-to ${uploadTo} --site-id ${siteId}`,
     );
   } else {
     console.log(JSON.stringify(recorded, null, 2));
     console.log(
-      `To upload later: node --experimental-transform-types helper.ts upload ${savedPath} --upload-to <baseUrl> --site-id <id>`,
+      `To upload later: node --experimental-transform-types index.ts helper upload ${savedPath} --upload-to <baseUrl> --site-id <id>`,
     );
   }
 }

@@ -25,6 +25,7 @@ import {
 } from "./db.ts";
 import { BUILD_INFO, PORT, getBuildInfo } from "./config.ts";
 import { encryptSecret } from "./crypto.ts";
+import { runHelper } from "./helper.ts";
 import { parseScript } from "./script.ts";
 import { runSite } from "./runner.ts";
 import { startScheduler } from "./scheduler.ts";
@@ -37,11 +38,19 @@ import {
   renderSiteList,
 } from "./templates.ts";
 
-if (process.argv.includes("--version")) {
+const cliArgs = process.argv.slice(2);
+const firstArg = cliArgs[0];
+
+if (firstArg === "--version") {
   const sha = BUILD_INFO?.sha ? BUILD_INFO.sha.slice(0, 7) : "unknown";
   const message = BUILD_INFO?.message ? ` - ${BUILD_INFO.message}` : "";
   console.log(`garden ${sha}${message}`);
   process.exit(0);
+}
+
+if (firstArg === "helper") {
+  const code = await runHelper(cliArgs.slice(1));
+  process.exit(code);
 }
 
 await initDb();

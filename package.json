@@ -7,7 +7,7 @@
     "@types/node": "^22.13.5"
   },
   "scripts": {
-    "helper": "NODE_NO_WARNINGS=1 node --env-file .env --experimental-transform-types helper.ts",
+    "helper": "NODE_NO_WARNINGS=1 node --env-file .env --experimental-transform-types index.ts helper",
     "dev": "NODE_NO_WARNINGS=1 node --env-file .env --experimental-transform-types index.ts",
     "mock:site": "NODE_NO_WARNINGS=1 node --env-file .env --experimental-transform-types testing/mock-site.ts",
     "seed": "NODE_NO_WARNINGS=1 node --env-file .env --experimental-transform-types scripts/seed.ts",
