@@ -417,24 +417,15 @@ async function solveCaptcha(
     throw new Error("Captcha step missing an initial click locator.");
   }
 
-  let containerLocator = page.locator("#captcha");
-  let containerSelector = "#captcha";
+  const containerLocator = resolveLocator(page, target.locator);
+  const containerSelector = "[data-garden-captcha=\"1\"]";
   try {
     await containerLocator.first().waitFor({ state: "attached", timeout: 5000 });
   } catch {
-    // fall through to locator fallback
+    // ignore, we'll handle after count check
   }
   if ((await containerLocator.count()) === 0) {
-    containerLocator = resolveLocator(page, target.locator);
-    try {
-      await containerLocator.first().waitFor({ state: "attached", timeout: 5000 });
-    } catch {
-      // ignore, we'll handle after count check
-    }
-    if ((await containerLocator.count()) === 0) {
-      throw new Error(`Captcha locator not found: ${target.locator}`);
-    }
-    containerSelector = "[data-garden-captcha=\"1\"]";
+    throw new Error(`Captcha locator not found: ${target.locator}`);
   }
   await containerLocator.first().scrollIntoViewIfNeeded({ timeout: 5000 });
 
