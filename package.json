@@ -7,12 +7,12 @@
     "@types/node": "^22.13.5"
   },
   "scripts": {
-    "helper": "NODE_NO_WARNINGS=1 node --experimental-transform-types helper.ts",
-    "dev": "NODE_NO_WARNINGS=1 node --experimental-transform-types index.ts",
-    "mock:site": "NODE_NO_WARNINGS=1 node --experimental-transform-types testing/mock-site.ts",
-    "seed": "NODE_NO_WARNINGS=1 node --experimental-transform-types scripts/seed.ts",
-    "start": "NODE_NO_WARNINGS=1 node --experimental-transform-types index.ts",
-    "test": "NODE_NO_WARNINGS=1 node --test --experimental-transform-types"
+    "helper": "NODE_NO_WARNINGS=1 node --env-file .env --experimental-transform-types helper.ts",
+    "dev": "NODE_NO_WARNINGS=1 node --env-file .env --experimental-transform-types index.ts",
+    "mock:site": "NODE_NO_WARNINGS=1 node --env-file .env --experimental-transform-types testing/mock-site.ts",
+    "seed": "NODE_NO_WARNINGS=1 node --env-file .env --experimental-transform-types scripts/seed.ts",
+    "start": "NODE_NO_WARNINGS=1 node --env-file .env --experimental-transform-types index.ts",
+    "test": "NODE_NO_WARNINGS=1 node --env-file .env --test --experimental-transform-types"
   },
   "peerDependencies": {
     "typescript": "^5"
