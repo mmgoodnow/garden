@@ -547,6 +547,15 @@ async function resolveImageAssets(
   const limit = 8;
 
   for (const [index, src] of unique.slice(0, limit).entries()) {
+    if (src.startsWith("data:")) {
+      resolved.push({
+        originalSrc: src,
+        dataUrl: src,
+        label: `image-${index + 1}`,
+      });
+      continue;
+    }
+
     let absolute: string;
     try {
       absolute = new URL(src, page.url()).toString();
