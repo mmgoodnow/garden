@@ -141,6 +141,7 @@ async function runScript(
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage();
   let captchaSequence = 0;
+  let screenshotCaptured = false;
 
   try {
     if (startUrl && script.steps[0]?.type !== "goto") {
@@ -171,7 +172,15 @@ async function runScript(
     }
 
     await captureScreenshot(runId, page);
+    screenshotCaptured = true;
   } finally {
+    if (!screenshotCaptured) {
+      try {
+        await captureScreenshot(runId, page);
+      } catch {
+        // best-effort screenshot on failure
+      }
+    }
     await browser.close();
   }
 }
@@ -410,8 +419,18 @@ async function solveCaptcha(
 
   let containerLocator = page.locator("#captcha");
   let containerSelector = "#captcha";
+  try {
+    await containerLocator.first().waitFor({ state: "attached", timeout: 5000 });
+  } catch {
+    // fall through to locator fallback
+  }
   if ((await containerLocator.count()) === 0) {
     containerLocator = resolveLocator(page, target.locator);
+    try {
+      await containerLocator.first().waitFor({ state: "attached", timeout: 5000 });
+    } catch {
+      // ignore, we'll handle after count check
+    }
     if ((await containerLocator.count()) === 0) {
       throw new Error(`Captcha locator not found: ${target.locator}`);
     }
