@@ -207,7 +207,8 @@ async function readScriptFile(path: string) {
 async function writeScriptFile(script: object) {
   const tmpDir = process.env.TMPDIR ?? "/tmp";
   const path = `${tmpDir}/garden-script-${Date.now()}.json`;
-  await writeFile(path, JSON.stringify(script, null, 2), "utf8");
+  const normalized = JSON.parse(JSON.stringify(script));
+  await writeFile(path, JSON.stringify(normalized, null, 2), "utf8");
   return path;
 }
 

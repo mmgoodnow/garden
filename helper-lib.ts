@@ -131,9 +131,6 @@ async function annotateCaptcha(steps: ActionStep[]): Promise<Step[]> {
     return steps;
   }
 
-  if (!hasCaptchaHint(steps)) {
-    return steps;
-  }
 
   const start = await pickStepIndex(
     "What's the first action of the captcha solution?",
@@ -166,14 +163,6 @@ async function annotateCaptcha(steps: ActionStep[]): Promise<Step[]> {
   updated.push({ type: "captcha", steps: captchaSteps });
   updated.push(...steps.slice(to + 1));
   return updated;
-}
-
-function hasCaptchaHint(steps: ActionStep[]) {
-  const hints = ["captcha", "recaptcha", "hcaptcha", "are you human"];
-  return steps.some((step) => {
-    const haystack = `${step.locator ?? ""} ${step.value ?? ""} ${step.args ?? ""}`.toLowerCase();
-    return hints.some((hint) => haystack.includes(hint));
-  });
 }
 
 function redactSecrets(steps: Step[]): {
