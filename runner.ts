@@ -408,10 +408,16 @@ async function solveCaptcha(
     throw new Error("Captcha step missing an initial click locator.");
   }
 
-  const locator = resolveLocator(page, target.locator);
-  await locator.scrollIntoViewIfNeeded();
+  let containerLocator = page.locator("#captcha");
+  if ((await containerLocator.count()) === 0) {
+    containerLocator = resolveLocator(page, target.locator);
+    if ((await containerLocator.count()) === 0) {
+      throw new Error(`Captcha locator not found: ${target.locator}`);
+    }
+  }
+  await containerLocator.first().scrollIntoViewIfNeeded({ timeout: 5000 });
 
-  const { html, imageSrcs } = await locator.evaluate((el) => {
+  const { html, imageSrcs } = await containerLocator.evaluate((el) => {
     const container = el.closest?.("#captcha") ?? el;
     const images = Array.from(container.querySelectorAll("img"))
       .map((img) => img.getAttribute("src"))
