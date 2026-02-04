@@ -18,6 +18,7 @@ FROM node:24-bookworm
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NODE_NO_WARNINGS=1
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 WORKDIR /app
 
@@ -27,7 +28,7 @@ RUN apt-get update \
 
 COPY package.json ./
 RUN npm install --omit=dev
-RUN npx playwright install --with-deps chromium
+RUN npx playwright install --with-deps chromium chromium-headless-shell
 
 COPY . .
 
