@@ -229,11 +229,25 @@ async function uploadWithCurl(base: string, payloadPath: string) {
       `@${payloadPath}`,
       `${base}/api/scripts`,
     ],
-    { stdio: "inherit" },
+    { stdio: ["ignore", "pipe", "pipe"] },
   );
+  let stdout = "";
+  let stderr = "";
+  proc.stdout?.on("data", (chunk) => {
+    stdout += chunk.toString();
+  });
+  proc.stderr?.on("data", (chunk) => {
+    stderr += chunk.toString();
+  });
   const exitCode = await new Promise<number>((resolve) => {
     proc.on("close", (code) => resolve(code ?? 1));
   });
+  if (stdout.trim()) {
+    console.log(`Server response: ${stdout.trim()}`);
+  }
+  if (stderr.trim()) {
+    console.error(stderr.trim());
+  }
   if (exitCode !== 0) {
     throw new Error(`curl upload failed with exit code ${exitCode}`);
   }
