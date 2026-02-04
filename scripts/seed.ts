@@ -58,6 +58,7 @@ for (const site of sites) {
     last_error: site.error,
     username_enc: credentials.username_enc,
     password_enc: credentials.password_enc,
+    cookies_enc: null,
   });
   if (!siteId) continue;
 

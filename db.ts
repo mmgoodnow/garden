@@ -9,6 +9,7 @@ export type SiteRow = {
   enabled: number;
   username_enc: string | null;
   password_enc: string | null;
+  cookies_enc: string | null;
   created_at: string;
   updated_at: string;
   last_run_at: string | null;
@@ -84,6 +85,7 @@ export async function initDb() {
       enabled integer not null default 1,
       username_enc text,
       password_enc text,
+      cookies_enc text,
       created_at text not null,
       updated_at text not null,
       last_run_at text,
@@ -92,6 +94,7 @@ export async function initDb() {
       last_error text
     );
   `);
+  ensureSitesCookiesColumn();
 
   sqlite.exec(`
     create table if not exists scripts (
@@ -176,8 +179,8 @@ export async function insertSite(values: Omit<SiteRow, "id">) {
   const result = sqlite
     .prepare(
       `insert into sites
-      (name, domain, enabled, username_enc, password_enc, created_at, updated_at, last_run_at, last_success_at, last_status, last_error)
-      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (name, domain, enabled, username_enc, password_enc, cookies_enc, created_at, updated_at, last_run_at, last_success_at, last_status, last_error)
+      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       values.name,
@@ -185,6 +188,7 @@ export async function insertSite(values: Omit<SiteRow, "id">) {
       values.enabled,
       values.username_enc,
       values.password_enc,
+      values.cookies_enc,
       values.created_at,
       values.updated_at,
       values.last_run_at,
@@ -206,6 +210,18 @@ export async function updateSite(siteId: number, values: Partial<SiteRow>) {
   if (!sets.length) return;
   params.push(siteId);
   sqlite.prepare(`update sites set ${sets.join(", ")} where id = ?`).run(...params);
+}
+
+function ensureSitesCookiesColumn() {
+  try {
+    const columns = sqlite
+      .prepare("pragma table_info(sites)")
+      .all() as Array<{ name: string }>;
+    if (columns.some((col) => col.name === "cookies_enc")) return;
+    sqlite.exec("alter table sites add column cookies_enc text;");
+  } catch {
+    // ignore
+  }
 }
 
 export async function getLatestScriptForSite(siteId: number) {

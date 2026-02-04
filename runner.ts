@@ -1,4 +1,4 @@
-import { chromium, type Locator, type Page } from "playwright";
+import { chromium, type Cookie, type Locator, type Page } from "playwright";
 import {
   getLatestRunId,
   getLatestScriptForSite,
@@ -80,7 +80,8 @@ export async function runSite(siteId: number) {
   try {
     const secrets = buildSecrets(site.username_enc, site.password_enc, script);
     const baseUrl = buildBaseUrl(site.domain);
-    await runScriptWithRetries(script, secrets, runId, baseUrl);
+    const cookies = buildCookies(site.cookies_enc, baseUrl);
+    await runScriptWithRetries(script, secrets, runId, baseUrl, cookies);
 
     const duration = Date.now() - startedAt;
     await updateRun(runId, {
@@ -136,10 +137,15 @@ async function runScript(
   runId: number,
   attempt: number,
   startUrl: string | null,
+  cookies: Cookie[],
   captchaError?: string,
 ) {
   const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
+  const context = await browser.newContext();
+  if (cookies.length > 0) {
+    await context.addCookies(cookies);
+  }
+  const page = await context.newPage();
   let captchaSequence = 0;
   let screenshotCaptured = false;
 
@@ -190,6 +196,7 @@ async function runScriptWithRetries(
   secrets: SecretValues,
   runId: number,
   startUrl: string | null,
+  cookies: Cookie[],
 ) {
   const retries = Number.parseInt(process.env.RUNNER_MAX_RETRIES ?? "1", 10);
   const delayMs = Number.parseInt(process.env.RUNNER_RETRY_DELAY_MS ?? "2000", 10);
@@ -206,7 +213,15 @@ async function runScriptWithRetries(
       total: attempts,
     });
     try {
-      await runScript(script, secrets, runId, attempt, startUrl, lastCaptchaError);
+      await runScript(
+        script,
+        secrets,
+        runId,
+        attempt,
+        startUrl,
+        cookies,
+        lastCaptchaError,
+      );
       return;
     } catch (error) {
       lastError = error;
@@ -344,6 +359,96 @@ function buildSecrets(
   }
 
   return values;
+}
+
+function buildCookies(
+  cookiesEnc: string | null,
+  baseUrl: string | null,
+): Cookie[] {
+  if (!cookiesEnc) return [];
+  let raw = "";
+  try {
+    raw = decryptSecret(cookiesEnc);
+  } catch {
+    return [];
+  }
+  return parseCookiesInput(raw, baseUrl);
+}
+
+function parseCookiesInput(raw: string, baseUrl: string | null): Cookie[] {
+  const text = raw.trim();
+  if (!text) return [];
+  if (text.startsWith("[") || text.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(text);
+      const items = Array.isArray(parsed)
+        ? parsed
+        : Array.isArray(parsed?.cookies)
+          ? parsed.cookies
+          : [];
+      return items
+        .map((item: Record<string, unknown>) =>
+          coerceCookie(item, baseUrl),
+        )
+        .filter((cookie): cookie is Cookie => Boolean(cookie));
+    } catch {
+      return [];
+    }
+  }
+
+  return parseCookieHeader(text, baseUrl);
+}
+
+function parseCookieHeader(header: string, baseUrl: string | null): Cookie[] {
+  if (!baseUrl) return [];
+  return header
+    .split(";")
+    .map((pair) => pair.trim())
+    .filter(Boolean)
+    .map((pair) => {
+      const idx = pair.indexOf("=");
+      if (idx <= 0) return null;
+      const name = pair.slice(0, idx).trim();
+      const value = pair.slice(idx + 1).trim();
+      if (!name) return null;
+      return { name, value, url: baseUrl } as Cookie;
+    })
+    .filter((cookie): cookie is Cookie => Boolean(cookie));
+}
+
+function coerceCookie(
+  item: Record<string, unknown>,
+  baseUrl: string | null,
+): Cookie | null {
+  const name = typeof item.name === "string" ? item.name : "";
+  const value = typeof item.value === "string" ? item.value : "";
+  if (!name) return null;
+
+  const cookie: Partial<Cookie> = {
+    name,
+    value,
+  };
+
+  if (typeof item.url === "string") {
+    cookie.url = item.url;
+  } else if (typeof item.domain === "string") {
+    cookie.domain = item.domain;
+    cookie.path = typeof item.path === "string" ? item.path : "/";
+  } else if (baseUrl) {
+    cookie.url = baseUrl;
+  } else {
+    return null;
+  }
+
+  if (typeof item.path === "string") cookie.path = item.path;
+  if (typeof item.expires === "number") cookie.expires = item.expires;
+  if (typeof item.httpOnly === "boolean") cookie.httpOnly = item.httpOnly;
+  if (typeof item.secure === "boolean") cookie.secure = item.secure;
+  if (typeof item.sameSite === "string") {
+    cookie.sameSite = item.sameSite as Cookie["sameSite"];
+  }
+
+  return cookie as Cookie;
 }
 
 function resolveLocator(page: Page, target: string): Locator {

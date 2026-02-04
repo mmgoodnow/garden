@@ -100,6 +100,7 @@ app.post("/sites", upload.none(), async (req, res) => {
     last_error: null,
     username_enc: null,
     password_enc: null,
+    cookies_enc: null,
   });
 
   res.redirect(303, siteId ? `/sites/${encodeURIComponent(domain)}` : "/");
@@ -206,6 +207,34 @@ app.post("/sites/:domain/credentials", upload.none(), async (req, res) => {
   }
 
   res.redirect(303, `/sites/${encodeURIComponent(domainParam)}`);
+});
+
+app.post("/sites/:domain/cookies", upload.none(), async (req, res) => {
+  const domainParam = String(req.params.domain ?? "").trim();
+  const cookies = String(req.body.cookies ?? "").trim();
+
+  try {
+    const siteId = await getSiteIdByDomain(domainParam);
+    if (!siteId) {
+      res
+        .status(404)
+        .type("html")
+        .send(layout("Error", `<section>Site not found.</section>`));
+      return;
+    }
+
+    await updateSite(siteId, {
+      cookies_enc: cookies ? encryptSecret(cookies) : null,
+      updated_at: new Date().toISOString(),
+    });
+    res.redirect(303, `/sites/${encodeURIComponent(domainParam)}`);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    res
+      .status(500)
+      .type("html")
+      .send(layout("Error", `<section>${message}</section>`));
+  }
 });
 
 app.post("/sites/:domain/script", upload.none(), async (req, res) => {

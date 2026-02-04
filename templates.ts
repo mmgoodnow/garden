@@ -459,6 +459,7 @@ export function renderSiteDetail(
     id: number;
     username_enc: string | null;
     password_enc: string | null;
+    cookies_enc: string | null;
   },
   script: ScriptRow | null,
   runs: RunRow[],
@@ -519,7 +520,23 @@ export function renderSiteDetail(
           <input name="username" placeholder="user@example.com" />
           <label>Password</label>
           <input name="password" type="password" />
-          <button type="submit">Update</button>
+          <button type="submit">Update Credentials</button>
+        </form>
+
+        <div class="card-divider"></div>
+
+        <div class="section-header">
+          <h3>Cookies</h3>
+          ${
+            site.cookies_enc
+              ? `<div class="status-pill ready">Cookies saved</div>`
+              : `<div class="status-pill missing">No cookies</div>`
+          }
+        </div>
+        <form method="post" action="/sites/${encodeURIComponent(site.domain)}/cookies">
+          <label>Cookie header or JSON</label>
+          <textarea name="cookies" rows="6" placeholder="name=value; name2=value2&#10;or JSON array of Playwright cookies"></textarea>
+          <button type="submit">Update Cookies</button>
         </form>
       </section>
 

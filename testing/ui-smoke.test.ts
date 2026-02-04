@@ -32,7 +32,7 @@ runTest(
 
       await page.locator('input[name="username"]').fill(MOCK_USERNAME);
       await page.locator('input[name="password"]').fill(MOCK_PASSWORD);
-      await page.getByRole("button", { name: "Update" }).click();
+      await page.getByRole("button", { name: "Update Credentials" }).click();
       await page.waitForSelector("text=Credentials saved");
 
       await page.locator('textarea[name="script"]').fill(scriptText);
