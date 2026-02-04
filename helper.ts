@@ -183,10 +183,7 @@ async function uploadScript(
     if (!(error instanceof Error) || !shouldOfferCurl(error)) {
       throw error;
     }
-    const useCurl = await confirm("Fetch failed. Do you want to try curl? (y/N)");
-    if (!useCurl) {
-      throw error;
-    }
+    console.log("Fetch failed; falling back to curl.");
     const payloadPath = await writePayloadFile(payload);
     await uploadWithCurl(base, payloadPath);
   }
