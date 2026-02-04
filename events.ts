@@ -1,5 +1,5 @@
 import type { Response } from "express";
-import { insertRunEvent } from "./db";
+import { insertRunEvent } from "./db.ts";
 
 type RunEvent = {
   type: string;

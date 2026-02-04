@@ -8,10 +8,10 @@ import {
   insertScreenshot,
   updateRun,
   updateSite,
-} from "./db";
-import { emitRunEvent } from "./events";
-import { decryptSecret } from "./crypto";
-import { parseScript, type RecordedScript, type Step } from "./script";
+} from "./db.ts";
+import { emitRunEvent } from "./events.ts";
+import { decryptSecret } from "./crypto.ts";
+import { parseScript, type RecordedScript, type Step } from "./script.ts";
 
 type SecretValues = {
   username?: string;

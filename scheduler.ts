@@ -1,5 +1,5 @@
-import { listSites } from "./db";
-import { runSite } from "./runner";
+import { listSites } from "./db.ts";
+import { runSite } from "./runner.ts";
 
 const DEFAULT_INTERVAL_MINUTES = 360;
 const DEFAULT_EVERY_DAYS = 30;

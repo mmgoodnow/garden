@@ -5,8 +5,8 @@ import {
   insertScreenshot,
   insertScript,
   insertSite,
-} from "../db";
-import { encryptSecret } from "../crypto";
+} from "../db.ts";
+import { encryptSecret } from "../crypto.ts";
 
 type SiteInput = {
   name: string;

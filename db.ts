@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
-import { DB_PATH, DATA_DIR } from "./config";
-import { ensureDir } from "./util";
+import { DB_PATH, DATA_DIR } from "./config.ts";
+import { ensureDir } from "./util.ts";
 
 export type SiteRow = {
   id: number;

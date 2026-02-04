@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline/promises";
 import { spawn } from "node:child_process";
 import { access, readFile, writeFile } from "node:fs/promises";
-import { processCodegen } from "./helper-lib";
+import { processCodegen } from "./helper-lib.ts";
 
 const USAGE = `garden helper
 

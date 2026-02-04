@@ -22,20 +22,20 @@ import {
   listScreenshotsForRuns,
   listSites,
   updateSite,
-} from "./db";
-import { BUILD_INFO, PORT } from "./config";
-import { encryptSecret } from "./crypto";
-import { parseScript } from "./script";
-import { runSite } from "./runner";
-import { startScheduler } from "./scheduler";
-import { subscribeRunEvents } from "./events";
+} from "./db.ts";
+import { BUILD_INFO, PORT } from "./config.ts";
+import { encryptSecret } from "./crypto.ts";
+import { parseScript } from "./script.ts";
+import { runSite } from "./runner.ts";
+import { startScheduler } from "./scheduler.ts";
+import { subscribeRunEvents } from "./events.ts";
 import {
   layout,
   renderNewSite,
   renderRunDetail,
   renderSiteDetail,
   renderSiteList,
-} from "./templates";
+} from "./templates.ts";
 
 if (process.argv.includes("--version")) {
   const sha = BUILD_INFO?.sha ? BUILD_INFO.sha.slice(0, 7) : "unknown";

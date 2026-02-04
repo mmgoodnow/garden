@@ -1,5 +1,5 @@
-import { BUILD_INFO, getBuildInfo } from "./config";
-import { escapeHtml } from "./util";
+import { BUILD_INFO, getBuildInfo } from "./config.ts";
+import { escapeHtml } from "./util.ts";
 
 type SiteRow = {
   id: number;
