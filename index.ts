@@ -23,7 +23,7 @@ import {
   listSites,
   updateSite,
 } from "./db.ts";
-import { BUILD_INFO, PORT } from "./config.ts";
+import { BUILD_INFO, PORT, getBuildInfo } from "./config.ts";
 import { encryptSecret } from "./crypto.ts";
 import { parseScript } from "./script.ts";
 import { runSite } from "./runner.ts";
@@ -354,6 +354,12 @@ app.get("/api/scripts/wait", async (req, res) => {
 });
 
 app.listen(PORT, () => {
+  const info = getBuildInfo();
+  if (info) {
+    console.log(`[build] commit ${info.sha.slice(0, 7)} ${info.message}`);
+  } else {
+    console.log("[build] commit unknown");
+  }
   console.log(`Garden server running on http://localhost:${PORT}`);
   const schedulerFlag = process.env.SCHEDULER_ENABLED?.toLowerCase();
   if (schedulerFlag !== "0" && schedulerFlag !== "false") {
