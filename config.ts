@@ -11,13 +11,15 @@ export { getBuildInfo };
 
 function getBuildInfo() {
   const fileInfo = readBuildInfoFile();
+  const envSha = process.env.GIT_COMMIT_SHA?.trim();
+  const envMessage = process.env.GIT_COMMIT_MESSAGE?.trim();
   const sha =
-    process.env.GIT_COMMIT_SHA ??
+    (envSha && envSha.length > 0 ? envSha : null) ??
     fileInfo.sha ??
     readGitFromFiles().sha ??
     readGit("rev-parse", "HEAD");
   const message =
-    process.env.GIT_COMMIT_MESSAGE ??
+    (envMessage && envMessage.length > 0 ? envMessage : null) ??
     fileInfo.message ??
     readGitFromFiles().message ??
     readGit("log", "-1", "--pretty=%s");
