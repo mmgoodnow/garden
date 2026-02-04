@@ -464,7 +464,17 @@ async function solveCaptcha(
   );
 
   const sanitizedHtml = sanitizeCaptchaHtml(html, secrets);
-  const resolvedImages = await resolveImageAssets(page, imageSrcs);
+  let resolvedImages = await resolveImageAssets(page, imageSrcs);
+  if (resolvedImages.length === 0 && imageSrcs.length > 0) {
+    const domImages = await resolveImageAssetsFromDom(
+      page,
+      containerSelector,
+      imageSrcs,
+    );
+    if (domImages.length > 0) {
+      resolvedImages = domImages;
+    }
+  }
   const { htmlWithMarkers, imageInputs, imageMap } = buildCaptchaPayload(
     sanitizedHtml,
     resolvedImages,
@@ -647,6 +657,35 @@ async function resolveImageAssets(
     });
   }
 
+  return resolved;
+}
+
+async function resolveImageAssetsFromDom(
+  page: Page,
+  containerSelector: string,
+  imageSrcs: CaptchaImageSource[],
+): Promise<ResolvedImage[]> {
+  const locator = page.locator(`${containerSelector} img`);
+  const count = Math.min(await locator.count(), imageSrcs.length, 8);
+  if (count === 0) return [];
+
+  const resolved: ResolvedImage[] = [];
+  for (let i = 0; i < count; i += 1) {
+    try {
+      const buffer = await locator.nth(i).screenshot({ type: "png" });
+      const original =
+        imageSrcs[i]?.originalSrc ??
+        imageSrcs[i]?.fetchSrc ??
+        `image-${i + 1}`;
+      resolved.push({
+        originalSrc: original ?? `image-${i + 1}`,
+        dataUrl: `data:image/png;base64,${buffer.toString("base64")}`,
+        label: `image-${i + 1}`,
+      });
+    } catch {
+      // ignore failed screenshot
+    }
+  }
   return resolved;
 }
 
