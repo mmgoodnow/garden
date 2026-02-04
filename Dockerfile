@@ -15,8 +15,6 @@ RUN node --experimental-transform-types scripts/build-info.ts /app/build-info.js
 
 FROM node:24-bookworm
 
-ARG GIT_COMMIT_SHA=""
-ARG GIT_COMMIT_MESSAGE=""
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV NODE_NO_WARNINGS=1
@@ -38,8 +36,6 @@ COPY --from=buildinfo /app/build-info.json /app/build-info.json
 ENV PORT=80
 ENV DATA_DIR=/config
 ENV DB_PATH=/config/garden.db
-ENV GIT_COMMIT_SHA=${GIT_COMMIT_SHA}
-ENV GIT_COMMIT_MESSAGE=${GIT_COMMIT_MESSAGE}
 ENV BUILD_INFO_PATH=/app/build-info.json
 
 RUN mkdir -p /config

@@ -2,9 +2,6 @@ services:
   garden:
     build:
       context: .
-      args:
-        GIT_COMMIT_SHA: ${GIT_COMMIT_SHA}
-        GIT_COMMIT_MESSAGE: ${GIT_COMMIT_MESSAGE}
     ports:
       - "80:80"
     environment:
