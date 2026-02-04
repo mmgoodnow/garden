@@ -31,7 +31,9 @@ export type RecordedScript = {
 export function parseScript(raw: string): RecordedScript {
   const parsed = JSON.parse(raw) as RecordedScript;
   if (!parsed || !Array.isArray(parsed.steps) || !Array.isArray(parsed.secrets)) {
-    throw new Error("Invalid script JSON.");
+    throw new Error(
+      "Invalid script format: expected JSON with 'steps' and 'secrets' arrays.",
+    );
   }
   return parsed;
 }
