@@ -409,22 +409,30 @@ async function solveCaptcha(
   }
 
   let containerLocator = page.locator("#captcha");
+  let containerSelector = "#captcha";
   if ((await containerLocator.count()) === 0) {
     containerLocator = resolveLocator(page, target.locator);
     if ((await containerLocator.count()) === 0) {
       throw new Error(`Captcha locator not found: ${target.locator}`);
     }
+    containerSelector = "[data-garden-captcha=\"1\"]";
   }
   await containerLocator.first().scrollIntoViewIfNeeded({ timeout: 5000 });
 
-  const { html, imageSrcs } = await containerLocator.evaluate((el) => {
-    const container = el.closest?.("#captcha") ?? el;
+  const { html, imageSrcs } = await containerLocator.evaluate(
+    (el, selector) => {
+      const container = el.closest?.("#captcha") ?? el;
+      if (selector !== "#captcha") {
+        container.setAttribute("data-garden-captcha", "1");
+      }
     const images = Array.from(container.querySelectorAll("img"))
       .map((img) => img.getAttribute("src"))
       .filter((src): src is string => Boolean(src));
 
     return { html: container.outerHTML, imageSrcs: images };
-  });
+    },
+    containerSelector,
+  );
 
   const sanitizedHtml = sanitizeCaptchaHtml(html, secrets);
   const resolvedImages = await resolveImageAssets(page, imageSrcs);
@@ -501,7 +509,7 @@ async function solveCaptcha(
 
   try {
     for (const modelStep of modelSteps) {
-      const normalized = normalizeCaptchaStep(modelStep);
+      const normalized = normalizeCaptchaStep(modelStep, containerSelector);
       await runStep(page, normalized, secrets, runId, attempt, sequence);
     }
     await recordCaptchaTrace({
@@ -631,7 +639,7 @@ function buildCaptchaRequest(
     "You are helping automate captcha completion inside a web page.",
     "Return ONLY JSON matching the provided schema.",
     "Use CSS selectors for locator fields (e.g. '#submit', '.tile:nth-child(2)').",
-    "All selectors MUST target elements inside the #captcha container.",
+    "Target elements shown in the captcha HTML fragment.",
     "Do NOT click any submit/sign-in/continue buttons; the caller will submit the form.",
     "Pick the option that best matches the poster/image.",
     "Only include the actions required to solve the captcha and proceed.",
@@ -764,7 +772,7 @@ function extractOutputText(payload: unknown): string {
   return content?.text ?? "";
 }
 
-function normalizeCaptchaStep(step: CaptchaModelStep): Step {
+function normalizeCaptchaStep(step: CaptchaModelStep, containerSelector: string): Step {
   if (step.type === "captcha") {
     throw new Error("Captcha solver returned nested captcha step.");
   }
@@ -778,7 +786,7 @@ function normalizeCaptchaStep(step: CaptchaModelStep): Step {
     throw new Error(`Captcha step missing locator for ${step.type}.`);
   }
 
-  const scopedLocator = scopeCaptchaSelector(locator);
+  const scopedLocator = scopeCaptchaSelector(locator, containerSelector);
 
   return {
     type: step.type,
@@ -796,7 +804,7 @@ function summarizeCaptchaSteps(steps: CaptchaModelStep[]) {
   }));
 }
 
-function scopeCaptchaSelector(locator: string): string {
+function scopeCaptchaSelector(locator: string, containerSelector: string): string {
   const trimmed = locator.trim();
   if (!trimmed) {
     throw new Error("Captcha selector is empty.");
@@ -813,10 +821,10 @@ function scopeCaptchaSelector(locator: string): string {
   ) {
     throw new Error("Captcha selector must be plain CSS.");
   }
-  if (trimmed.startsWith("#captcha")) {
+  if (trimmed.startsWith(containerSelector)) {
     return trimmed;
   }
-  return `#captcha ${trimmed}`;
+  return `${containerSelector} ${trimmed}`;
 }
 
 function redactSecretsInText(text: string, secrets: SecretValues) {
