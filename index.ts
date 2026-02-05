@@ -150,7 +150,7 @@ app.get("/sites/:domain", async (req, res) => {
   }
 
   const scheduleDays = Number.parseInt(
-    process.env.SCHEDULE_EVERY_DAYS ?? "30",
+    process.env.SCHEDULE_EVERY_DAYS ?? "6",
     10,
   );
   const scheduleWindowDays = Math.max(scheduleDays, 1);
