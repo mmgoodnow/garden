@@ -4,11 +4,12 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends git \
-  && rm -rf /var/lib/apt/lists/*
+ARG GIT_SHA
+ARG GIT_COMMIT_MESSAGE
 
-COPY .git .git
+ENV GIT_COMMIT_SHA=$GIT_SHA
+ENV GIT_COMMIT_MESSAGE=$GIT_COMMIT_MESSAGE
+
 COPY scripts/build-info.ts scripts/build-info.ts
 
 RUN node --experimental-transform-types scripts/build-info.ts /app/build-info.json
