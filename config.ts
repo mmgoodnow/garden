@@ -10,17 +10,14 @@ export const BUILD_INFO = getBuildInfo();
 export { getBuildInfo };
 
 function getBuildInfo() {
-  const fileInfo = readBuildInfoFile();
   const envSha = process.env.GIT_COMMIT_SHA?.trim();
   const envMessage = process.env.GIT_COMMIT_MESSAGE?.trim();
   const sha =
     (envSha && envSha.length > 0 ? envSha : null) ??
-    fileInfo.sha ??
     readGitFromFiles().sha ??
     readGit("rev-parse", "HEAD");
   const message =
     (envMessage && envMessage.length > 0 ? envMessage : null) ??
-    fileInfo.message ??
     readGitFromFiles().message ??
     readGit("log", "-1", "--pretty=%s");
 
@@ -85,17 +82,4 @@ function readPackedRef(ref: string) {
     if (name === ref) return hash;
   }
   return null;
-}
-
-function readBuildInfoFile() {
-  try {
-    const path =
-      process.env.BUILD_INFO_PATH ?? join(process.cwd(), "build-info.json");
-    if (!existsSync(path)) return { sha: null, message: null };
-    const raw = readFileSync(path, "utf8");
-    const data = JSON.parse(raw) as { sha?: string; message?: string };
-    return { sha: data.sha ?? null, message: data.message ?? null };
-  } catch {
-    return { sha: null, message: null };
-  }
 }

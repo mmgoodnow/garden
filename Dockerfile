@@ -1,19 +1,3 @@
-FROM node:24-bookworm AS buildinfo
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-WORKDIR /app
-
-ARG GIT_SHA
-ARG GIT_COMMIT_MESSAGE
-
-ENV GIT_COMMIT_SHA=$GIT_SHA
-ENV GIT_COMMIT_MESSAGE=$GIT_COMMIT_MESSAGE
-
-COPY scripts/build-info.ts scripts/build-info.ts
-
-RUN node --experimental-transform-types scripts/build-info.ts /app/build-info.json
-
 FROM node:24-bookworm
 
 
@@ -22,6 +6,12 @@ ENV NODE_NO_WARNINGS=1
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 WORKDIR /app
+
+ARG GIT_SHA
+ARG GIT_COMMIT_MESSAGE
+
+ENV GIT_COMMIT_SHA=$GIT_SHA
+ENV GIT_COMMIT_MESSAGE=$GIT_COMMIT_MESSAGE
 
 RUN apt-get update \
   && apt-get install -y --no-install-recommends tini \
@@ -33,12 +23,9 @@ RUN npx playwright install --with-deps chromium chromium-headless-shell
 
 COPY . .
 
-COPY --from=buildinfo /app/build-info.json /app/build-info.json
-
 ENV PORT=80
 ENV DATA_DIR=/config
 ENV DB_PATH=/config/garden.db
-ENV BUILD_INFO_PATH=/app/build-info.json
 
 RUN mkdir -p /config
 
