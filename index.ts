@@ -289,6 +289,23 @@ app.post("/sites/:domain/run", async (req, res) => {
   res.redirect(303, `/sites/${encodeURIComponent(domainParam)}`);
 });
 
+app.post("/runs/all", async (_req, res) => {
+  res.redirect(303, "/");
+
+  void (async () => {
+    const sites = await listSites();
+    for (const site of sites) {
+      if (!site.enabled) continue;
+      try {
+        await runSite(site.id);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.error(`[runner] run all failed for site ${site.id}: ${message}`);
+      }
+    }
+  })();
+});
+
 app.post("/sites/:domain/delete", async (req, res) => {
   const domainParam = String(req.params.domain ?? "").trim();
   const siteId = await getSiteIdByDomain(domainParam);

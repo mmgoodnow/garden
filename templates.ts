@@ -418,7 +418,12 @@ export function renderSiteList(sites: SiteRow[]) {
   return layout(
     "Sites",
     `<section>
-      <h2>Sites</h2>
+      <div class="section-header">
+        <h2>Sites</h2>
+        <form method="post" action="/runs/all">
+          <button type="submit" class="secondary">Run All</button>
+        </form>
+      </div>
       <table>
         <thead>
           <tr>
