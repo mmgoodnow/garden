@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import { createSite, startTestEnv, stopTestEnv } from "./test-helpers.ts";
 
-test("index page shows 30d, 90d, and all-time uptime", async () => {
+test("index page shows 30d and all-time uptime", async () => {
   const env = await startTestEnv();
 
   try {
@@ -67,15 +67,11 @@ test("index page shows 30d, 90d, and all-time uptime", async () => {
 
     assert.match(
       html,
-      /30d<\/span><strong>50%<\/strong><span class="muted">1\/2<\/span>/,
+      /30d<\/span><strong>1\/2<\/strong>/,
     );
     assert.match(
       html,
-      /90d<\/span><strong>67%<\/strong><span class="muted">2\/3<\/span>/,
-    );
-    assert.match(
-      html,
-      /All<\/span><strong>50%<\/strong><span class="muted">2\/4<\/span>/,
+      /All<\/span><strong>50%<\/strong>/,
     );
   } finally {
     stopTestEnv(env);

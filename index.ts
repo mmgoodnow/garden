@@ -98,8 +98,10 @@ app.post("/sites", upload.none(), async (req, res) => {
     name,
     domain,
     enabled: 1,
+    archived: 0,
     created_at: now,
     updated_at: now,
+    archived_at: null,
     last_run_at: null,
     last_success_at: null,
     last_status: null,
@@ -281,15 +283,22 @@ app.post("/sites/:domain/script", upload.none(), async (req, res) => {
 
 app.post("/sites/:domain/run", async (req, res) => {
   const domainParam = String(req.params.domain ?? "").trim();
-  const siteId = await getSiteIdByDomain(domainParam);
-  if (!siteId) {
+  const site = await getSiteByDomain(domainParam);
+  if (!site) {
     res
       .status(404)
       .type("html")
       .send(layout("Error", `<section>Site not found.</section>`));
     return;
   }
-  runSite(siteId).catch((error) => {
+  if (site.archived) {
+    res
+      .status(400)
+      .type("html")
+      .send(layout("Error", `<section>Archived sites cannot be run.</section>`));
+    return;
+  }
+  runSite(site.id).catch((error) => {
     console.error("Run failed", error);
   });
   res.redirect(303, `/sites/${encodeURIComponent(domainParam)}`);
@@ -301,6 +310,7 @@ app.post("/runs/all", async (_req, res) => {
   void (async () => {
     const sites = await listSites();
     for (const site of sites) {
+      if (site.archived) continue;
       if (!site.enabled) continue;
       try {
         await runSite(site.id);
@@ -310,6 +320,48 @@ app.post("/runs/all", async (_req, res) => {
       }
     }
   })();
+});
+
+app.post("/sites/:domain/archive", async (req, res) => {
+  const domainParam = String(req.params.domain ?? "").trim();
+  const siteId = await getSiteIdByDomain(domainParam);
+  if (!siteId) {
+    res
+      .status(404)
+      .type("html")
+      .send(layout("Not Found", `<section>Site not found.</section>`));
+    return;
+  }
+
+  await updateSite(siteId, {
+    archived: 1,
+    archived_at: new Date().toISOString(),
+    enabled: 0,
+    updated_at: new Date().toISOString(),
+  });
+
+  res.redirect(303, `/sites/${encodeURIComponent(domainParam)}`);
+});
+
+app.post("/sites/:domain/unarchive", async (req, res) => {
+  const domainParam = String(req.params.domain ?? "").trim();
+  const siteId = await getSiteIdByDomain(domainParam);
+  if (!siteId) {
+    res
+      .status(404)
+      .type("html")
+      .send(layout("Not Found", `<section>Site not found.</section>`));
+    return;
+  }
+
+  await updateSite(siteId, {
+    archived: 0,
+    archived_at: null,
+    enabled: 1,
+    updated_at: new Date().toISOString(),
+  });
+
+  res.redirect(303, `/sites/${encodeURIComponent(domainParam)}`);
 });
 
 app.post("/sites/:domain/delete", async (req, res) => {

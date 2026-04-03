@@ -27,6 +27,7 @@ export function startScheduler() {
 
       const now = Date.now();
       for (const site of sites) {
+        if (site.archived) continue;
         if (!site.enabled) continue;
 
         const lastRun = site.last_run_at ? Date.parse(site.last_run_at) : NaN;

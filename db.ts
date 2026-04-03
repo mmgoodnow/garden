@@ -7,11 +7,13 @@ export type SiteRow = {
   name: string;
   domain: string;
   enabled: number;
+  archived: number;
   username_enc: string | null;
   password_enc: string | null;
   cookies_enc: string | null;
   created_at: string;
   updated_at: string;
+  archived_at: string | null;
   last_run_at: string | null;
   last_success_at: string | null;
   last_status: string | null;
@@ -93,11 +95,13 @@ export async function initDb() {
       name text not null,
       domain text not null,
       enabled integer not null default 1,
+      archived integer not null default 0,
       username_enc text,
       password_enc text,
       cookies_enc text,
       created_at text not null,
       updated_at text not null,
+      archived_at text,
       last_run_at text,
       last_success_at text,
       last_status text,
@@ -105,6 +109,7 @@ export async function initDb() {
     );
   `);
   ensureSitesCookiesColumn();
+  ensureSitesArchiveColumns();
 
   sqlite.exec(`
     create table if not exists scripts (
@@ -189,18 +194,20 @@ export async function insertSite(values: Omit<SiteRow, "id">) {
   const result = sqlite
     .prepare(
       `insert into sites
-      (name, domain, enabled, username_enc, password_enc, cookies_enc, created_at, updated_at, last_run_at, last_success_at, last_status, last_error)
-      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      (name, domain, enabled, archived, username_enc, password_enc, cookies_enc, created_at, updated_at, archived_at, last_run_at, last_success_at, last_status, last_error)
+      values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       values.name,
       values.domain,
       values.enabled,
+      values.archived,
       values.username_enc,
       values.password_enc,
       values.cookies_enc,
       values.created_at,
       values.updated_at,
+      values.archived_at,
       values.last_run_at,
       values.last_success_at,
       values.last_status,
@@ -229,6 +236,22 @@ function ensureSitesCookiesColumn() {
       .all() as Array<{ name: string }>;
     if (columns.some((col) => col.name === "cookies_enc")) return;
     sqlite.exec("alter table sites add column cookies_enc text;");
+  } catch {
+    // ignore
+  }
+}
+
+function ensureSitesArchiveColumns() {
+  try {
+    const columns = sqlite
+      .prepare("pragma table_info(sites)")
+      .all() as Array<{ name: string }>;
+    if (!columns.some((col) => col.name === "archived")) {
+      sqlite.exec("alter table sites add column archived integer not null default 0;");
+    }
+    if (!columns.some((col) => col.name === "archived_at")) {
+      sqlite.exec("alter table sites add column archived_at text;");
+    }
   } catch {
     // ignore
   }

@@ -6,7 +6,9 @@ type SiteRow = {
   name: string;
   domain: string;
   enabled: number;
+  archived: number;
   last_status: string | null;
+  archived_at: string | null;
   last_run_at: string | null;
   last_success_at: string | null;
 };
@@ -315,6 +317,12 @@ export function layout(title: string, body: string) {
         color: var(--muted);
         text-transform: uppercase;
       }
+      .site-state {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
       .status-pill {
         display: inline-flex;
         align-items: center;
@@ -432,16 +440,31 @@ export function renderSiteList(
   sites: SiteRow[],
   uptimeBySite: Record<number, SiteUptimeRow | undefined> = {},
 ) {
-  const rows = sites
+  const activeSites = sites.filter((site) => !site.archived);
+  const archivedSites = sites.filter((site) => site.archived);
+
+  const activeRows = activeSites
     .map(
       (site) => `<tr>
         <td><a href="/sites/${encodeURIComponent(site.domain)}">${escapeHtml(site.name)}</a></td>
         <td>${escapeHtml(site.domain)}</td>
-        <td>${site.enabled ? "Enabled" : "Disabled"}</td>
+        <td>${renderSiteState(site)}</td>
         <td>${renderUptimeStack(uptimeBySite[site.id])}</td>
         <td>${renderStatus(site.last_status ?? "never")}</td>
         <td>${formatTimestamp(site.last_run_at)}</td>
         <td>${formatTimestamp(site.last_success_at)}</td>
+      </tr>`,
+    )
+    .join("");
+  const archivedRows = archivedSites
+    .map(
+      (site) => `<tr>
+        <td><a href="/sites/${encodeURIComponent(site.domain)}">${escapeHtml(site.name)}</a></td>
+        <td>${escapeHtml(site.domain)}</td>
+        <td>${renderSiteState(site)}</td>
+        <td>${formatTimestamp(site.archived_at)}</td>
+        <td>${renderUptimeStack(uptimeBySite[site.id])}</td>
+        <td>${renderStatus(site.last_status ?? "never")}</td>
       </tr>`,
     )
     .join("");
@@ -450,7 +473,7 @@ export function renderSiteList(
     "Sites",
     `<section>
       <div class="section-header">
-        <h2>Sites</h2>
+        <h2>Active Sites</h2>
         <form method="post" action="/runs/all">
           <button type="submit" class="secondary">Run All</button>
         </form>
@@ -468,7 +491,27 @@ export function renderSiteList(
           </tr>
         </thead>
         <tbody>
-          ${rows || `<tr><td colspan="7" class="muted">No sites yet.</td></tr>`}
+          ${activeRows || `<tr><td colspan="7" class="muted">No active sites.</td></tr>`}
+        </tbody>
+      </table>
+    </section>
+    <section>
+      <div class="section-header">
+        <h2>Archived Sites</h2>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Domain</th>
+            <th>Status</th>
+            <th>Archived At</th>
+            <th>Uptime</th>
+            <th>Last Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${archivedRows || `<tr><td colspan="6" class="muted">No archived sites.</td></tr>`}
         </tbody>
       </table>
     </section>`,
@@ -494,6 +537,8 @@ export function renderNewSite() {
 export function renderSiteDetail(
   site: SiteRow & {
     id: number;
+    archived: number;
+    archived_at: string | null;
     username_enc: string | null;
     password_enc: string | null;
     cookies_enc: string | null;
@@ -534,15 +579,35 @@ export function renderSiteDetail(
         <h2>${escapeHtml(site.name)}</h2>
         <p class="muted">${escapeHtml(site.domain)}</p>
         <div class="actions">
-          <form method="post" action="/sites/${encodeURIComponent(site.domain)}/run">
+          ${
+            site.archived
+              ? ""
+              : `<form method="post" action="/sites/${encodeURIComponent(site.domain)}/run">
             <button type="submit">Run Now</button>
-          </form>
+          </form>`
+          }
+          ${
+            site.archived
+              ? `<form method="post" action="/sites/${encodeURIComponent(site.domain)}/unarchive">
+            <button type="submit" class="secondary">Unarchive Site</button>
+          </form>`
+              : `<form method="post" action="/sites/${encodeURIComponent(site.domain)}/archive" onsubmit="return confirm('Archive this site and stop future runs?');">
+            <button type="submit" class="secondary">Archive Site</button>
+          </form>`
+          }
           <form method="post" action="/sites/${encodeURIComponent(site.domain)}/delete" onsubmit="return confirm('Delete this site and all related data?');">
             <button type="submit" class="secondary">Delete Site</button>
           </form>
         </div>
 
         <div class="card-divider"></div>
+
+        ${
+          site.archived
+            ? `<div class="status-pill">Archived${site.archived_at ? ` · ${escapeHtml(formatTimestamp(site.archived_at))}` : ""}</div>
+        <div class="card-divider"></div>`
+            : ""
+        }
 
         <div class="section-header">
           <h3>Credentials</h3>
@@ -591,7 +656,7 @@ export function renderSiteDetail(
           </div>
           <div class="last-run-item">
             <span>Next run</span>
-            <strong>${formatTimestamp(nextRunAt)}</strong>
+            <strong>${site.archived ? "Archived" : formatTimestamp(nextRunAt)}</strong>
           </div>
           <div class="last-run-item">
             <span>Last error</span>
@@ -909,9 +974,16 @@ function renderStatus(status: string) {
 function renderUptimeStack(uptime: SiteUptimeRow | undefined) {
   return `<div class="uptime-stack">
     ${renderUptimeItem("30d", uptime?.successful_runs_30d ?? 0, uptime?.completed_runs_30d ?? 0)}
-    ${renderUptimeItem("90d", uptime?.successful_runs_90d ?? 0, uptime?.completed_runs_90d ?? 0)}
     ${renderUptimeItem("All", uptime?.successful_runs_all ?? 0, uptime?.completed_runs_all ?? 0)}
   </div>`;
+}
+
+function renderSiteState(site: SiteRow) {
+  const labels = [`<span>${site.enabled ? "Enabled" : "Disabled"}</span>`];
+  if (site.archived) {
+    labels.unshift(`<span>Archived</span>`);
+  }
+  return `<div class="site-state">${labels.join('<span class="muted">·</span>')}</div>`;
 }
 
 function renderUptimeItem(label: string, successfulRuns: number, completedRuns: number) {
@@ -919,7 +991,8 @@ function renderUptimeItem(label: string, successfulRuns: number, completedRuns: 
     return `<div class="uptime-item"><span class="uptime-label">${escapeHtml(label)}</span><span class="muted">-</span></div>`;
   }
   const percent = ((successfulRuns / completedRuns) * 100).toFixed(0);
-  return `<div class="uptime-item"><span class="uptime-label">${escapeHtml(label)}</span><strong>${percent}%</strong><span class="muted">${successfulRuns}/${completedRuns}</span></div>`;
+  const value = label.toLowerCase() === "all" ? `${percent}%` : `${successfulRuns}/${completedRuns}`;
+  return `<div class="uptime-item"><span class="uptime-label">${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
 }
 
 function defaultScheme(domain: string) {
