@@ -63,6 +63,16 @@ export type RunEventRow = {
   created_at: string;
 };
 
+export type RunUptimeRow = {
+  site_id: number;
+  completed_runs_30d: number;
+  successful_runs_30d: number;
+  completed_runs_90d: number;
+  successful_runs_90d: number;
+  completed_runs_all: number;
+  successful_runs_all: number;
+};
+
 export const sqlite = createSqlite();
 
 function createSqlite() {
@@ -286,6 +296,31 @@ export async function listRunsForSite(siteId: number, limit = 10) {
 
 export async function listRunsBySite(siteId: number) {
   return sqlite.prepare("select * from runs where site_id = ?").all(siteId) as RunRow[];
+}
+
+export async function listRunUptimeBySite(
+  startedAfter30d: string,
+  startedAfter90d: string,
+) {
+  return sqlite
+    .prepare(
+      `select
+        site_id,
+        sum(case when status != 'running' and started_at >= ? then 1 else 0 end) as completed_runs_30d,
+        sum(case when status = 'success' and started_at >= ? then 1 else 0 end) as successful_runs_30d,
+        sum(case when status != 'running' and started_at >= ? then 1 else 0 end) as completed_runs_90d,
+        sum(case when status = 'success' and started_at >= ? then 1 else 0 end) as successful_runs_90d,
+        sum(case when status != 'running' then 1 else 0 end) as completed_runs_all,
+        sum(case when status = 'success' then 1 else 0 end) as successful_runs_all
+      from runs
+      group by site_id`,
+    )
+    .all(
+      startedAfter30d,
+      startedAfter30d,
+      startedAfter90d,
+      startedAfter90d,
+    ) as RunUptimeRow[];
 }
 
 export async function getLatestRunId() {

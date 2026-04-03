@@ -19,6 +19,7 @@ import {
   listRunEventsForRun,
   listRunsBySite,
   listRunsForSite,
+  listRunUptimeBySite,
   listScreenshotsForRuns,
   listSites,
   updateSite,
@@ -62,7 +63,12 @@ app.use(express.json({ limit: "5mb" }));
 
 app.get("/", async (_req, res) => {
   const sites = await listSites();
-  res.status(200).type("html").send(renderSiteList(sites));
+  const now = Date.now();
+  const startedAfter30d = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const startedAfter90d = new Date(now - 90 * 24 * 60 * 60 * 1000).toISOString();
+  const uptimeRows = await listRunUptimeBySite(startedAfter30d, startedAfter90d);
+  const uptimeBySite = Object.fromEntries(uptimeRows.map((row) => [row.site_id, row]));
+  res.status(200).type("html").send(renderSiteList(sites, uptimeBySite));
 });
 
 app.get("/sites/new", async (_req, res) => {

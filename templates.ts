@@ -11,6 +11,16 @@ type SiteRow = {
   last_success_at: string | null;
 };
 
+type SiteUptimeRow = {
+  site_id: number;
+  completed_runs_30d: number;
+  successful_runs_30d: number;
+  completed_runs_90d: number;
+  successful_runs_90d: number;
+  completed_runs_all: number;
+  successful_runs_all: number;
+};
+
 type RunRow = {
   id: number;
   status: string;
@@ -288,6 +298,23 @@ export function layout(title: string, body: string) {
         background: var(--border);
         margin: 16px 0;
       }
+      .uptime-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .uptime-item {
+        display: flex;
+        align-items: baseline;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .uptime-label {
+        min-width: 42px;
+        font-size: 12px;
+        color: var(--muted);
+        text-transform: uppercase;
+      }
       .status-pill {
         display: inline-flex;
         align-items: center;
@@ -401,13 +428,17 @@ export function layout(title: string, body: string) {
 </html>`;
 }
 
-export function renderSiteList(sites: SiteRow[]) {
+export function renderSiteList(
+  sites: SiteRow[],
+  uptimeBySite: Record<number, SiteUptimeRow | undefined> = {},
+) {
   const rows = sites
     .map(
       (site) => `<tr>
         <td><a href="/sites/${encodeURIComponent(site.domain)}">${escapeHtml(site.name)}</a></td>
         <td>${escapeHtml(site.domain)}</td>
         <td>${site.enabled ? "Enabled" : "Disabled"}</td>
+        <td>${renderUptimeStack(uptimeBySite[site.id])}</td>
         <td>${renderStatus(site.last_status ?? "never")}</td>
         <td>${formatTimestamp(site.last_run_at)}</td>
         <td>${formatTimestamp(site.last_success_at)}</td>
@@ -430,13 +461,14 @@ export function renderSiteList(sites: SiteRow[]) {
             <th>Name</th>
             <th>Domain</th>
             <th>Status</th>
+            <th>Uptime</th>
             <th>Last Run</th>
             <th>Last Run At</th>
             <th>Last Success</th>
           </tr>
         </thead>
         <tbody>
-          ${rows || `<tr><td colspan="6" class="muted">No sites yet.</td></tr>`}
+          ${rows || `<tr><td colspan="7" class="muted">No sites yet.</td></tr>`}
         </tbody>
       </table>
     </section>`,
@@ -872,6 +904,22 @@ function renderStatus(status: string) {
   if (normalized === "running") return "⏳ running";
   if (normalized === "never") return "— never";
   return escapeHtml(status);
+}
+
+function renderUptimeStack(uptime: SiteUptimeRow | undefined) {
+  return `<div class="uptime-stack">
+    ${renderUptimeItem("30d", uptime?.successful_runs_30d ?? 0, uptime?.completed_runs_30d ?? 0)}
+    ${renderUptimeItem("90d", uptime?.successful_runs_90d ?? 0, uptime?.completed_runs_90d ?? 0)}
+    ${renderUptimeItem("All", uptime?.successful_runs_all ?? 0, uptime?.completed_runs_all ?? 0)}
+  </div>`;
+}
+
+function renderUptimeItem(label: string, successfulRuns: number, completedRuns: number) {
+  if (completedRuns === 0) {
+    return `<div class="uptime-item"><span class="uptime-label">${escapeHtml(label)}</span><span class="muted">-</span></div>`;
+  }
+  const percent = ((successfulRuns / completedRuns) * 100).toFixed(0);
+  return `<div class="uptime-item"><span class="uptime-label">${escapeHtml(label)}</span><strong>${percent}%</strong><span class="muted">${successfulRuns}/${completedRuns}</span></div>`;
 }
 
 function defaultScheme(domain: string) {
