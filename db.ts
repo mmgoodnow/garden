@@ -73,6 +73,8 @@ export type RunUptimeRow = {
   successful_runs_90d: number;
   completed_runs_all: number;
   successful_runs_all: number;
+  recent_statuses_30d: string[];
+  recent_statuses_all: string[];
 };
 
 export const sqlite = createSqlite();
@@ -325,7 +327,7 @@ export async function listRunUptimeBySite(
   startedAfter30d: string,
   startedAfter90d: string,
 ) {
-  return sqlite
+  const uptimeRows = sqlite
     .prepare(
       `select
         site_id,
@@ -343,7 +345,58 @@ export async function listRunUptimeBySite(
       startedAfter30d,
       startedAfter90d,
       startedAfter90d,
-    ) as RunUptimeRow[];
+    ) as Omit<RunUptimeRow, "recent_statuses_30d" | "recent_statuses_all">[];
+
+  const recent30dRows = sqlite
+    .prepare(
+      `select site_id, status
+      from (
+        select
+          site_id,
+          status,
+          row_number() over (partition by site_id order by started_at desc, id desc) as run_rank
+        from runs
+        where status != 'running' and started_at >= ?
+      )
+      where run_rank <= 5
+      order by site_id, run_rank`,
+    )
+    .all(startedAfter30d) as Array<{ site_id: number; status: string }>;
+
+  const recentAllRows = sqlite
+    .prepare(
+      `select site_id, status
+      from (
+        select
+          site_id,
+          status,
+          row_number() over (partition by site_id order by started_at desc, id desc) as run_rank
+        from runs
+        where status != 'running'
+      )
+      where run_rank <= 5
+      order by site_id, run_rank`,
+    )
+    .all() as Array<{ site_id: number; status: string }>;
+
+  const recent30dBySite = groupStatusesBySite(recent30dRows);
+  const recentAllBySite = groupStatusesBySite(recentAllRows);
+
+  return uptimeRows.map((row) => ({
+    ...row,
+    recent_statuses_30d: recent30dBySite.get(row.site_id) ?? [],
+    recent_statuses_all: recentAllBySite.get(row.site_id) ?? [],
+  }));
+}
+
+function groupStatusesBySite(rows: Array<{ site_id: number; status: string }>) {
+  const statusesBySite = new Map<number, string[]>();
+  for (const row of rows) {
+    const statuses = statusesBySite.get(row.site_id) ?? [];
+    statuses.push(row.status);
+    statusesBySite.set(row.site_id, statuses);
+  }
+  return statusesBySite;
 }
 
 export async function getLatestRunId() {

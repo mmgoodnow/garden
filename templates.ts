@@ -21,6 +21,8 @@ type SiteUptimeRow = {
   successful_runs_90d: number;
   completed_runs_all: number;
   successful_runs_all: number;
+  recent_statuses_30d: string[];
+  recent_statuses_all: string[];
 };
 
 type RunRow = {
@@ -307,15 +309,53 @@ export function layout(title: string, body: string) {
       }
       .uptime-item {
         display: flex;
-        align-items: baseline;
+        align-items: center;
         gap: 8px;
-        flex-wrap: wrap;
       }
       .uptime-label {
         min-width: 42px;
         font-size: 12px;
         color: var(--muted);
         text-transform: uppercase;
+      }
+      .uptime-meter {
+        width: 62px;
+        display: inline-flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+      .uptime-dots {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 4px;
+        width: 100%;
+      }
+      .uptime-dot {
+        display: block;
+        width: 8px;
+        height: 8px;
+        border: 1px solid var(--muted);
+        border-radius: 999px;
+      }
+      .uptime-dot.is-filled {
+        background: var(--accent);
+        border-color: var(--accent);
+      }
+      .uptime-dot.is-missing {
+        opacity: 0.35;
+      }
+      .uptime-bar {
+        width: 100%;
+        height: 6px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        overflow: hidden;
+        background: var(--panel-2);
+      }
+      .uptime-bar-fill {
+        display: block;
+        height: 100%;
+        background: var(--accent);
       }
       .site-state {
         display: inline-flex;
@@ -973,8 +1013,8 @@ function renderStatus(status: string) {
 
 function renderUptimeStack(uptime: SiteUptimeRow | undefined) {
   return `<div class="uptime-stack">
-    ${renderUptimeItem("30d", uptime?.successful_runs_30d ?? 0, uptime?.completed_runs_30d ?? 0)}
-    ${renderUptimeItem("All", uptime?.successful_runs_all ?? 0, uptime?.completed_runs_all ?? 0)}
+    ${renderUptimeItem("30d", uptime?.successful_runs_30d ?? 0, uptime?.completed_runs_30d ?? 0, uptime?.recent_statuses_30d ?? [])}
+    ${renderUptimeItem("All", uptime?.successful_runs_all ?? 0, uptime?.completed_runs_all ?? 0, uptime?.recent_statuses_all ?? [])}
   </div>`;
 }
 
@@ -986,13 +1026,36 @@ function renderSiteState(site: SiteRow) {
   return `<div class="site-state">${labels.join('<span class="muted">·</span>')}</div>`;
 }
 
-function renderUptimeItem(label: string, successfulRuns: number, completedRuns: number) {
+function renderUptimeItem(
+  label: string,
+  successfulRuns: number,
+  completedRuns: number,
+  recentStatuses: string[],
+) {
   if (completedRuns === 0) {
     return `<div class="uptime-item"><span class="uptime-label">${escapeHtml(label)}</span><span class="muted">-</span></div>`;
   }
-  const percent = ((successfulRuns / completedRuns) * 100).toFixed(0);
-  const value = label.toLowerCase() === "all" ? `${percent}%` : `${successfulRuns}/${completedRuns}`;
-  return `<div class="uptime-item"><span class="uptime-label">${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
+  const percent = Math.max(0, Math.min(100, Math.round((successfulRuns / completedRuns) * 100)));
+  const dots = Array.from({ length: 5 }, (_, index) => {
+    const status = recentStatuses[index];
+    const className = [
+      "uptime-dot",
+      status === "success" ? "is-filled" : "",
+      status ? "" : "is-missing",
+    ].filter(Boolean).join(" ");
+    return `<span class="${className}" aria-hidden="true"></span>`;
+  }).join("");
+  const recentText = recentStatuses.length
+    ? ` Last ${recentStatuses.length} completed runs: ${recentStatuses.join(", ")}.`
+    : "";
+  const labelText = `${label} uptime ${successfulRuns} of ${completedRuns} successful runs, ${percent}%.${recentText}`;
+  return `<div class="uptime-item">
+    <span class="uptime-label">${escapeHtml(label)}</span>
+    <span class="uptime-meter" aria-label="${escapeHtml(labelText)}" title="${escapeHtml(labelText)}">
+      <span class="uptime-dots">${dots}</span>
+      <span class="uptime-bar" aria-hidden="true"><span class="uptime-bar-fill" style="width: ${percent}%"></span></span>
+    </span>
+  </div>`;
 }
 
 function defaultScheme(domain: string) {

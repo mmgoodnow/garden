@@ -67,11 +67,15 @@ test("index page shows 30d and all-time uptime", async () => {
 
     assert.match(
       html,
-      /30d<\/span><strong>1\/2<\/strong>/,
+      /aria-label="30d uptime 1 of 2 successful runs, 50%. Last 2 completed runs: success, failed."/,
     );
     assert.match(
       html,
-      /All<\/span><strong>50%<\/strong>/,
+      /aria-label="All uptime 2 of 4 successful runs, 50%. Last 4 completed runs: success, failed, success, failed."/,
+    );
+    assert.match(
+      html,
+      /<span class="uptime-dot is-filled" aria-hidden="true"><\/span><span class="uptime-dot" aria-hidden="true"><\/span><span class="uptime-dot is-missing" aria-hidden="true"><\/span>/,
     );
   } finally {
     stopTestEnv(env);
