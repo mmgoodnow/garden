@@ -1,4 +1,4 @@
-import { DatabaseSync } from "node:sqlite";
+import { DatabaseSync, type SQLInputValue } from "node:sqlite";
 import { DB_PATH, DATA_DIR } from "./config.ts";
 import { ensureDir } from "./util.ts";
 
@@ -220,9 +220,10 @@ export async function insertSite(values: Omit<SiteRow, "id">) {
 
 export async function updateSite(siteId: number, values: Partial<SiteRow>) {
   const sets: string[] = [];
-  const params: unknown[] = [];
+  const params: SQLInputValue[] = [];
   for (const [key, value] of Object.entries(values)) {
     if (key === "id") continue;
+    if (value === undefined) continue;
     sets.push(`${key} = ?`);
     params.push(value);
   }
@@ -300,9 +301,10 @@ export async function insertRun(values: Omit<RunRow, "id">) {
 
 export async function updateRun(runId: number, values: Partial<RunRow>) {
   const sets: string[] = [];
-  const params: unknown[] = [];
+  const params: SQLInputValue[] = [];
   for (const [key, value] of Object.entries(values)) {
     if (key === "id") continue;
+    if (value === undefined) continue;
     sets.push(`${key} = ?`);
     params.push(value);
   }

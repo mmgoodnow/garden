@@ -45,7 +45,7 @@ export function emitRunEvent(runId: number, event: RunEvent) {
 
   if (clients && clients.size > 0) {
     for (const client of Array.from(clients)) {
-      if (!sendEvent(client.controller, event, "message")) {
+      if (!sendEvent(client.res, event, "message")) {
         cleanupClient(runId, client);
       }
     }

@@ -16,6 +16,7 @@ const runTest = hasOpenAI ? test : test.skip;
 
 runTest(
   "UI smoke flow (create site, upload script, run)",
+  { timeout: TIMEOUT_MS },
   async () => {
     const env = await startTestEnv();
     const browser = await chromium.launch({ headless: true });
@@ -49,7 +50,6 @@ runTest(
       stopTestEnv(env);
     }
   },
-  TIMEOUT_MS,
 );
 
 async function waitForRunSuccess(page: Page, timeoutMs: number) {

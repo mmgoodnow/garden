@@ -1,5 +1,19 @@
+export type ActionType =
+  | "goto"
+  | "click"
+  | "dblclick"
+  | "fill"
+  | "press"
+  | "type"
+  | "check"
+  | "uncheck"
+  | "selectOption"
+  | "hover"
+  | "tap"
+  | "focus";
+
 export type ActionStep = {
-  type: string;
+  type: ActionType;
   locator?: string;
   url?: string;
   value?: string;
@@ -30,19 +44,25 @@ export type RecordedScript = {
   secrets: SecretSpec[];
 };
 
+type ParsedCodegenScript = Omit<RecordedScript, "steps"> & {
+  steps: ActionStep[];
+};
+
 export async function processCodegen(text: string): Promise<RecordedScript> {
   const recorded = parseCodegen(text);
   const annotated = await annotateCaptcha(recorded.steps);
   const redacted = redactSecrets(annotated);
-  recorded.steps = redacted.steps;
-  recorded.secrets = await mapSecretKinds(redacted.secrets, redacted.steps);
-  return recorded;
+  return {
+    ...recorded,
+    steps: redacted.steps,
+    secrets: await mapSecretKinds(redacted.secrets, redacted.steps),
+  };
 }
 
-export function parseCodegen(text: string): RecordedScript {
+export function parseCodegen(text: string): ParsedCodegenScript {
   const steps: ActionStep[] = [];
   const lines = text.split(/\r?\n/);
-  const actions = new Set([
+  const actions = new Set<ActionType>([
     "click",
     "dblclick",
     "fill",
@@ -70,6 +90,7 @@ export function parseCodegen(text: string): RecordedScript {
     if (!match) continue;
 
     const [, target, action, rawArgs] = match;
+    if (!target || !isActionType(action) || rawArgs === undefined) continue;
     if (!actions.has(action)) continue;
 
     const step: ActionStep = {
@@ -256,7 +277,7 @@ function findSecretHint(placeholder: string, steps: Step[]): string {
 
 function extractFirstStringLiteral(input: string): string | null {
   const match = input.match(/(['"`])((?:\\.|(?!\1).)*)\1/);
-  return match ? match[2] : null;
+  return match?.[2] ?? null;
 }
 
 function promptLine(question: string): Promise<string> {
@@ -336,7 +357,9 @@ async function pickStepIndex(
     }
 
     for (let i = start; i < end; i += 1) {
-      const summary = summarizeStep(steps[i]);
+      const step = steps[i];
+      if (!step) continue;
+      const summary = summarizeStep(step);
       if (i === index) {
         console.log(`  ${highlight}>> ${i + 1}. ${summary}${reset}`);
         continue;
@@ -399,4 +422,21 @@ async function pickStepIndex(
 
     stdin.on("data", onData);
   });
+}
+
+function isActionType(value: string | undefined): value is ActionType {
+  return (
+    value === "goto" ||
+    value === "click" ||
+    value === "dblclick" ||
+    value === "fill" ||
+    value === "press" ||
+    value === "type" ||
+    value === "check" ||
+    value === "uncheck" ||
+    value === "selectOption" ||
+    value === "hover" ||
+    value === "tap" ||
+    value === "focus"
+  );
 }

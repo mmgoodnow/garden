@@ -19,6 +19,7 @@ const runTest = hasOpenAI ? test : test.skip;
 
 runTest(
   "helper output runs against mock login flow",
+  { timeout: TIMEOUT_MS },
   async () => {
     const env = await startTestEnv();
 
@@ -61,5 +62,4 @@ await page.goto('http://localhost:${env.mockPort}/dashboard');
       stopTestEnv(env);
     }
   },
-  TIMEOUT_MS,
 );

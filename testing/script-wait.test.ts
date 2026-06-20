@@ -10,6 +10,7 @@ import {
 
 test(
   "scripts wait endpoint returns latest script after upload",
+  { timeout: 30000 },
   async () => {
     const env = await startTestEnv();
     try {
@@ -32,5 +33,4 @@ test(
       stopTestEnv(env);
     }
   },
-  30000,
 );

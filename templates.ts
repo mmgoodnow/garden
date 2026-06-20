@@ -11,6 +11,7 @@ type SiteRow = {
   archived_at: string | null;
   last_run_at: string | null;
   last_success_at: string | null;
+  last_error: string | null;
 };
 
 type SiteUptimeRow = {

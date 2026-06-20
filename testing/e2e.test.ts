@@ -17,6 +17,7 @@ const runTest = hasOpenAI ? test : test.skip;
 
 runTest(
   "runner end-to-end flow (mock site + curl-style API calls)",
+  { timeout: 60000 },
   async () => {
     const env = await startTestEnv();
     try {
@@ -49,5 +50,4 @@ runTest(
       stopTestEnv(env);
     }
   },
-  60000,
 );

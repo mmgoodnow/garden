@@ -1,4 +1,4 @@
-import { chromium, type Cookie, type Locator, type Page } from "playwright";
+import { chromium, type BrowserContext, type Locator, type Page } from "playwright";
 import {
   getLatestRunId,
   getLatestScriptForSite,
@@ -11,7 +11,14 @@ import {
 } from "./db.ts";
 import { emitRunEvent } from "./events.ts";
 import { decryptSecret } from "./crypto.ts";
-import { parseScript, type RecordedScript, type Step } from "./script.ts";
+import {
+  parseScript,
+  type ActionType,
+  type RecordedScript,
+  type Step,
+} from "./script.ts";
+
+type BrowserCookie = Parameters<BrowserContext["addCookies"]>[0][number];
 
 type SecretValues = {
   username?: string;
@@ -145,7 +152,7 @@ async function runScript(
   runId: number,
   attempt: number,
   startUrl: string | null,
-  cookies: Cookie[],
+  cookies: BrowserCookie[],
   captchaError?: string,
 ) {
   const browser = await chromium.launch({ headless: true });
@@ -204,7 +211,7 @@ async function runScriptWithRetries(
   secrets: SecretValues,
   runId: number,
   startUrl: string | null,
-  cookies: Cookie[],
+  cookies: BrowserCookie[],
 ) {
   const retries = Number.parseInt(process.env.RUNNER_MAX_RETRIES ?? "1", 10);
   const delayMs = Number.parseInt(process.env.RUNNER_RETRY_DELAY_MS ?? "2000", 10);
@@ -315,7 +322,7 @@ async function runStep(
 function summarizeStep(step: Step) {
   return {
     type: step.type,
-    locator: step.locator ?? null,
+    locator: step.type === "captcha" ? null : step.locator ?? null,
     url: step.type === "goto" ? step.url ?? null : null,
   };
 }
@@ -372,7 +379,7 @@ function buildSecrets(
 function buildCookies(
   cookiesEnc: string | null,
   baseUrl: string | null,
-): Cookie[] {
+): BrowserCookie[] {
   if (!cookiesEnc) return [];
   let raw = "";
   try {
@@ -383,22 +390,20 @@ function buildCookies(
   return parseCookiesInput(raw, baseUrl);
 }
 
-function parseCookiesInput(raw: string, baseUrl: string | null): Cookie[] {
+function parseCookiesInput(raw: string, baseUrl: string | null): BrowserCookie[] {
   const text = raw.trim();
   if (!text) return [];
   if (text.startsWith("[") || text.startsWith("{")) {
     try {
       const parsed = JSON.parse(text);
-      const items = Array.isArray(parsed)
+      const items: unknown[] = Array.isArray(parsed)
         ? parsed
-        : Array.isArray(parsed?.cookies)
+        : isRecord(parsed) && Array.isArray(parsed.cookies)
           ? parsed.cookies
           : [];
       return items
-        .map((item: Record<string, unknown>) =>
-          coerceCookie(item, baseUrl),
-        )
-        .filter((cookie): cookie is Cookie => Boolean(cookie));
+        .map((item) => (isRecord(item) ? coerceCookie(item, baseUrl) : null))
+        .filter(isBrowserCookie);
     } catch {
       return [];
     }
@@ -407,56 +412,67 @@ function parseCookiesInput(raw: string, baseUrl: string | null): Cookie[] {
   return parseCookieHeader(text, baseUrl);
 }
 
-function parseCookieHeader(header: string, baseUrl: string | null): Cookie[] {
+function parseCookieHeader(header: string, baseUrl: string | null): BrowserCookie[] {
   if (!baseUrl) return [];
   return header
     .split(";")
     .map((pair) => pair.trim())
     .filter(Boolean)
-    .map((pair) => {
+    .map((pair): BrowserCookie | null => {
       const idx = pair.indexOf("=");
       if (idx <= 0) return null;
       const name = pair.slice(0, idx).trim();
       const value = pair.slice(idx + 1).trim();
       if (!name) return null;
-      return { name, value, url: baseUrl } as Cookie;
+      return { name, value, url: baseUrl };
     })
-    .filter((cookie): cookie is Cookie => Boolean(cookie));
+    .filter(isBrowserCookie);
+}
+
+function isBrowserCookie(cookie: BrowserCookie | null): cookie is BrowserCookie {
+  return Boolean(cookie);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
 }
 
 function coerceCookie(
   item: Record<string, unknown>,
   baseUrl: string | null,
-): Cookie | null {
+): BrowserCookie | null {
   const name = typeof item.name === "string" ? item.name : "";
   const value = typeof item.value === "string" ? item.value : "";
   if (!name) return null;
 
-  const cookie: Partial<Cookie> = {
-    name,
-    value,
-  };
-
   if (typeof item.url === "string") {
-    cookie.url = item.url;
+    return applyCookieOptions({ name, value, url: item.url }, item);
   } else if (typeof item.domain === "string") {
-    cookie.domain = item.domain;
-    cookie.path = typeof item.path === "string" ? item.path : "/";
+    return applyCookieOptions(
+      {
+        name,
+        value,
+        domain: item.domain,
+        path: typeof item.path === "string" ? item.path : "/",
+      },
+      item,
+    );
   } else if (baseUrl) {
-    cookie.url = baseUrl;
+    return applyCookieOptions({ name, value, url: baseUrl }, item);
   } else {
     return null;
   }
+}
 
-  if (typeof item.path === "string") cookie.path = item.path;
+function applyCookieOptions(
+  cookie: BrowserCookie,
+  item: Record<string, unknown>,
+): BrowserCookie {
   if (typeof item.expires === "number") cookie.expires = item.expires;
   if (typeof item.httpOnly === "boolean") cookie.httpOnly = item.httpOnly;
   if (typeof item.secure === "boolean") cookie.secure = item.secure;
-  if (typeof item.sameSite === "string") {
-    cookie.sameSite = item.sameSite as Cookie["sameSite"];
-  }
-
-  return cookie as Cookie;
+  if (isSameSite(item.sameSite)) cookie.sameSite = item.sameSite;
+  return cookie;
 }
 
 function resolveLocator(page: Page, target: string): Locator {
@@ -513,12 +529,12 @@ function resolveLocator(page: Page, target: string): Locator {
 
 function extractFirstStringLiteral(input: string): string | null {
   const match = input.match(/(['"`])((?:\\.|(?!\1).)*)\1/);
-  return match ? match[2] : null;
+  return match?.[2] ?? null;
 }
 
 function extractNameOption(input: string): string | null {
   const match = input.match(/name:\s*(['"`])((?:\\.|(?!\1).)*)\1/);
-  return match ? match[2] : null;
+  return match?.[2] ?? null;
 }
 
 function extractExactOption(input: string): boolean | null {
@@ -1014,12 +1030,37 @@ function normalizeCaptchaStep(step: CaptchaModelStep, containerSelector: string)
 
   const scopedLocator = scopeCaptchaSelector(locator, containerSelector);
 
+  if (!isActionType(step.type)) {
+    throw new Error(`Captcha solver returned disallowed step type: ${step.type}.`);
+  }
+
   return {
     type: step.type,
     locator: scopedLocator,
     value: step.value,
     args: step.args,
   };
+}
+
+function isActionType(value: string): value is ActionType {
+  return (
+    value === "goto" ||
+    value === "click" ||
+    value === "dblclick" ||
+    value === "fill" ||
+    value === "press" ||
+    value === "type" ||
+    value === "check" ||
+    value === "uncheck" ||
+    value === "selectOption" ||
+    value === "hover" ||
+    value === "tap" ||
+    value === "focus"
+  );
+}
+
+function isSameSite(value: unknown): value is BrowserCookie["sameSite"] {
+  return value === "Strict" || value === "Lax" || value === "None";
 }
 
 function summarizeCaptchaSteps(steps: CaptchaModelStep[]) {
