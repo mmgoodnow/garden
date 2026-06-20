@@ -772,7 +772,7 @@ export function renderSiteDetail(
         const origin = window.location.origin;
         const siteUrl = ${JSON.stringify(siteUrl)};
         const cmd =
-          "node --experimental-transform-types /Users/mmgoodnow/src/garden/index.ts helper record " +
+          "node --experimental-strip-types /Users/mmgoodnow/src/garden/index.ts helper record " +
           siteUrl +
           " --upload-to " +
           origin +

@@ -88,7 +88,7 @@ test("disabled sites cannot be run manually or through the runner", async () => 
     const runnerRes = spawnSync(
       process.execPath,
       [
-        "--experimental-transform-types",
+        "--experimental-strip-types",
         "--input-type=module",
         "-e",
         "import { runSite } from './runner.ts'; try { await runSite(Number(process.argv[1])); process.exit(1); } catch (error) { console.log(error instanceof Error ? error.message : String(error)); }",

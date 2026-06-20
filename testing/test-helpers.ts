@@ -39,7 +39,7 @@ export async function startTestEnv(): Promise<TestEnv> {
   const mockLogs: string[] = [];
   const nodePath = process.execPath;
 
-  const serverProc = spawn(nodePath, ["--experimental-transform-types", "index.ts"], {
+  const serverProc = spawn(nodePath, ["--experimental-strip-types", "index.ts"], {
     cwd: ROOT,
     env: {
       ...process.env,
@@ -56,7 +56,7 @@ export async function startTestEnv(): Promise<TestEnv> {
   drain(serverProc.stdout, serverLogs);
   drain(serverProc.stderr, serverLogs);
 
-  const mockProc = spawn(nodePath, ["--experimental-transform-types", "testing/mock-site.ts"], {
+  const mockProc = spawn(nodePath, ["--experimental-strip-types", "testing/mock-site.ts"], {
     cwd: ROOT,
     env: {
       ...process.env,

@@ -33,4 +33,4 @@ VOLUME ["/config"]
 EXPOSE 80
 
 ENTRYPOINT ["tini", "--"]
-CMD ["node", "--experimental-transform-types", "index.ts"]
+CMD ["node", "--experimental-strip-types", "index.ts"]
