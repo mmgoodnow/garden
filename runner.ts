@@ -48,6 +48,14 @@ export async function runSite(siteId: number) {
     throw new Error(`Site ${siteId} not found.`);
   }
 
+  if (site.archived) {
+    throw new Error("Archived sites cannot be run.");
+  }
+
+  if (!site.enabled) {
+    throw new Error("Disabled sites cannot be run.");
+  }
+
   const scriptRow = await getLatestScriptForSite(siteId);
 
   if (!scriptRow) {

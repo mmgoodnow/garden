@@ -298,6 +298,13 @@ app.post("/sites/:domain/run", async (req, res) => {
       .send(layout("Error", `<section>Archived sites cannot be run.</section>`));
     return;
   }
+  if (!site.enabled) {
+    res
+      .status(400)
+      .type("html")
+      .send(layout("Error", `<section>Disabled sites cannot be run.</section>`));
+    return;
+  }
   runSite(site.id).catch((error) => {
     console.error("Run failed", error);
   });
