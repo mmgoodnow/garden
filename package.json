@@ -15,7 +15,7 @@
     "test": "NODE_NO_WARNINGS=1 node --env-file .env --test --experimental-strip-types"
   },
   "peerDependencies": {
-    "typescript": "^5"
+    "typescript": "^7.0.2"
   },
   "private": true,
   "type": "module",
