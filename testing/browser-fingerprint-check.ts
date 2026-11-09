@@ -48,7 +48,7 @@ try {
   try {
     const shellSignals = await check(
       await shell.newPage(),
-      "Garden's default headless shell",
+      "Playwright's default headless shell",
       "Chromium",
     );
 

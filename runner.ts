@@ -1,4 +1,5 @@
-import { chromium, type BrowserContext, type Locator, type Page } from "playwright";
+import type { Locator, Page } from "playwright";
+import { launchGardenBrowser, newGardenPage, type BrowserCookie } from "./browser.ts";
 import {
   getLatestRunId,
   getLatestScriptForSite,
@@ -17,8 +18,6 @@ import {
   type RecordedScript,
   type Step,
 } from "./script.ts";
-
-type BrowserCookie = Parameters<BrowserContext["addCookies"]>[0][number];
 
 type SecretValues = {
   username?: string;
@@ -155,16 +154,13 @@ async function runScript(
   cookies: BrowserCookie[],
   captchaError?: string,
 ) {
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
-  if (cookies.length > 0) {
-    await context.addCookies(cookies);
-  }
-  const page = await context.newPage();
+  const browser = await launchGardenBrowser();
+  let page: Page | undefined;
   let captchaSequence = 0;
   let screenshotCaptured = false;
 
   try {
+    page = await newGardenPage(browser, cookies);
     if (startUrl && script.steps[0]?.type !== "goto") {
       emitRunEvent(runId, { type: "auto.goto", url: startUrl });
       await page.goto(startUrl, { waitUntil: "domcontentloaded" });
@@ -195,7 +191,7 @@ async function runScript(
     await captureFinalScreenshot(runId, page);
     screenshotCaptured = true;
   } finally {
-    if (!screenshotCaptured) {
+    if (page && !screenshotCaptured) {
       try {
         await captureFinalScreenshot(runId, page);
       } catch {
