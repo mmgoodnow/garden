@@ -5,6 +5,10 @@ const COOKIE_NAME = "mock_session";
 const COOKIE_VALUE = "ok";
 const CAPTCHA_POSTER_PATH = new URL("./captcha-poster.png", import.meta.url);
 const CAPTCHA_POSTER_DATA = readFileSync(CAPTCHA_POSTER_PATH);
+const BROWSER_FINGERPRINT_PAGE = readFileSync(
+  new URL("./browser-fingerprint.html", import.meta.url),
+  "utf8",
+);
 
 function parseCookies(cookieHeader: string | null) {
   if (!cookieHeader) return {} as Record<string, string>;
@@ -91,6 +95,17 @@ function captchaError(message = "") {
 
 const app = express();
 app.use(express.urlencoded({ extended: false }));
+
+app.get("/browser-fingerprint", (_req, res) => {
+  res.type("html").send(BROWSER_FINGERPRINT_PAGE);
+});
+
+app.get("/browser-fingerprint/signals", (req, res) => {
+  res.set("Cache-Control", "no-store").json({
+    userAgent: req.get("User-Agent") ?? null,
+    brands: req.get("Sec-CH-UA") ?? null,
+  });
+});
 
 app.get("/", (req, res) => {
   if (isAuthenticated(req)) {

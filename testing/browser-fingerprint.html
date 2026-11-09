@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Browser Fingerprint Lab</title>
+    <link rel="icon" href="data:," />
+    <style>
+      :root {
+        color-scheme: light dark;
+        font: 100% / 1.5 system-ui, sans-serif;
+      }
+      main {
+        max-width: 48rem;
+        margin: 3rem auto;
+        padding: 0 1rem;
+      }
+      h1, h2 { line-height: 1.2; }
+      section {
+        margin-block: 1.5rem;
+        padding: 0.5rem 1rem;
+        border: 1px solid GrayText;
+        border-radius: 0.5rem;
+      }
+      pre {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Browser Fingerprint Lab</h1>
+      <p>Compare what a browser reports in HTTP headers with what it exposes to JavaScript.</p>
+      <section aria-labelledby="classification-heading">
+        <h2 id="classification-heading">Reported browser</h2>
+        <p role="status">
+          <strong id="classification">Checking…</strong><br />
+          <span id="reason"></span>
+        </p>
+        <p>These signals are self-reported and can be overridden. The WebDriver flag is shown separately as an automation signal.</p>
+      </section>
+      <section aria-labelledby="signals-heading">
+        <h2 id="signals-heading">Raw signals</h2>
+        <pre id="signals"></pre>
+      </section>
+    </main>
+    <script type="module">
+      function classifyBrand(brands) {
+        if (brands.includes("Microsoft Edge")) return "Microsoft Edge";
+        if (brands.includes("Google Chrome")) return "Google Chrome";
+        if (brands.includes("Chromium")) return "Chromium";
+        return null;
+      }
+
+      function classify(server, client) {
+        const headerBrands = Array.from(
+          (server.brands ?? "").matchAll(/(?:^|,)\s*"((?:[^"\\]|\\.)*)"\s*;\s*v="[0-9.]+"/g),
+          ([, brand]) => brand,
+        );
+        const headerBrand = classifyBrand(headerBrands);
+        const scriptBrand = classifyBrand(client.brands?.map(({ brand }) => brand) ?? []);
+
+        if (headerBrand && scriptBrand && headerBrand !== scriptBrand) {
+          return ["Conflicting brand hints", "The HTTP and JavaScript brand hints disagree."];
+        }
+        const brand = headerBrand ?? scriptBrand;
+        if (brand) {
+          const source = headerBrand && scriptBrand ? "HTTP and JavaScript" : headerBrand ? "HTTP" : "JavaScript";
+          return [brand, `Reported by ${source} brand hints.`];
+        }
+        const chromeToken = /\b(?:Chrome|HeadlessChrome|CriOS)\//;
+        if (chromeToken.test(server.userAgent ?? "") || chromeToken.test(client.userAgent)) {
+          return ["Chrome-like user agent", "The user agent contains a Chrome token and the brand is unconfirmed."];
+        }
+        return ["Undetermined", "No recognized Chrome-family signals were available."];
+      }
+
+      const classification = document.querySelector("#classification");
+      const reason = document.querySelector("#reason");
+      try {
+        const response = await fetch("/browser-fingerprint/signals");
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const server = await response.json();
+        const client = {
+          userAgent: navigator.userAgent,
+          brands: navigator.userAgentData?.brands ?? null,
+          webdriver: navigator.webdriver,
+        };
+        const [label, explanation] = classify(server, client);
+        document.querySelector("#signals").textContent = JSON.stringify({ server, client }, null, 2);
+        classification.textContent = label;
+        reason.textContent = explanation;
+      } catch (error) {
+        classification.textContent = "Signal collection failed";
+        reason.textContent = error.message;
+      }
+    </script>
+  </body>
+</html>
