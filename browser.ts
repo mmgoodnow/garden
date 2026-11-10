@@ -30,7 +30,7 @@ export async function newGardenPage(browser: Browser, cookies: BrowserCookie[] =
   try {
     await versionPage.goto("chrome://version/");
     identity = await versionPage.evaluate(async () => {
-      const { userAgentData, userAgent, platform } = navigator as Navigator & {
+      const { userAgentData, userAgent } = navigator as Navigator & {
         userAgentData: {
           getHighEntropyValues(hints: string[]): Promise<ChromeMetadata>;
         };
@@ -38,25 +38,13 @@ export async function newGardenPage(browser: Browser, cookies: BrowserCookie[] =
       const metadata = await userAgentData.getHighEntropyValues([
         "architecture", "bitness", "model", "platformVersion", "wow64",
       ]);
-      return { userAgent, platform, metadata };
+      return { userAgent, metadata };
     });
   } finally {
     await versionPage.close();
   }
 
-  let userAgent = identity.userAgent.replace("HeadlessChrome/", "Chrome/");
-  let platform = identity.platform;
-  const metadata = identity.metadata;
-  if (metadata.platform === "Linux") {
-    userAgent = userAgent.replace(/\([^)]*\)/, "(Windows NT 10.0; Win64; x64)");
-    platform = "Win32";
-    metadata.platform = "Windows";
-    metadata.platformVersion = "19.0.0";
-    metadata.architecture = "x86";
-    metadata.bitness = "64";
-    metadata.wow64 = false;
-  }
-
+  const userAgent = identity.userAgent.replace("HeadlessChrome/", "Chrome/");
   const context = await browser.newContext({ viewport: null, userAgent });
   if (cookies.length > 0) await context.addCookies(cookies);
 
@@ -65,8 +53,7 @@ export async function newGardenPage(browser: Browser, cookies: BrowserCookie[] =
   // Chrome fills in its own brand list and version hints when they are omitted.
   await session.send("Emulation.setUserAgentOverride", {
     userAgent,
-    platform,
-    userAgentMetadata: metadata,
+    userAgentMetadata: identity.metadata,
   });
   return page;
 }

@@ -33,7 +33,7 @@ node --experimental-strip-types testing/browser-fingerprint-check.ts
 
 The check compares installed Chrome, Playwright's default headless Chromium shell, and three Chromium overrides. A Playwright `userAgent` override leaves the Chromium brand hints visible. A DevTools user-agent override without metadata suppresses the hints, so the page reports a Chrome-like user agent. Overriding both the string and the brand hints through DevTools makes Chromium report the same brand as Chrome.
 
-Garden's runner uses branded Chrome with its installed version and brand hints. On Linux, the main page and its requests report a Windows desktop through the user agent and platform client hints. Worker APIs, graphics, and fonts can still expose the Linux host.
+Garden's runner uses branded Chrome with its installed version, brand hints, and native platform. On Linux, the user agent and platform client hints report Linux.
 
 Codebase map:
 

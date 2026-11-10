@@ -74,10 +74,10 @@ test("Garden presents a consistent Chrome identity to the page and server", { ti
   assert.notDeepEqual(signals.viewport, signals.screen);
 
   if (process.platform === "linux") {
-    assert.match(signals.userAgent, /Windows NT 10\.0/);
-    assert.equal(signals.platform, "Win32");
-    assert.equal(signals.hintedPlatform, "Windows");
-    assert.match(signals.hintedPlatformVersion ?? "", /^[1-9]\d*\.\d+\.\d+$/);
+    assert.match(signals.userAgent, /\bLinux\b/);
+    assert.match(signals.platform, /^Linux\b/);
+    assert.equal(signals.hintedPlatform, "Linux");
+    assert.equal(signals.hintedPlatformVersion, "");
     const platformVersion = await page.evaluate(async () => {
       const response = await fetch("/platform-version");
       return (await response.json()).platformVersion;
